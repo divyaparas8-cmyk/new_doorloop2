@@ -36,7 +36,7 @@ const router = (0, express_1.Router)();
 router.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
-        service: 'WhatsLandlord ERP Backend',
+        service: 'Avenix Code Software Technology ERP Backend',
         timestamp: new Date().toISOString(),
     });
 });

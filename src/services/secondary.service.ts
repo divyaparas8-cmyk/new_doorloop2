@@ -278,7 +278,7 @@ export class SecondaryService {
             messages: [
               {
                 role: 'system',
-                content: `You are the WhatsLandlord ERP AI Assistant. You assist property managers, owners, and tenants with rental operations. Answer user questions strictly based on the following isolated live database context. Never expose or reveal data from other companies or managers.\n\nLIVE SCOPED CONTEXT:\n${scopedContextText}`,
+                content: `You are the Avenix Code Software Technology ERP AI Assistant. You assist property managers, owners, and tenants with rental operations. Answer user questions strictly based on the following isolated live database context. Never expose or reveal data from other companies or managers.\n\nLIVE SCOPED CONTEXT:\n${scopedContextText}`,
               },
               { role: 'user', content: prompt },
             ],
@@ -325,7 +325,7 @@ export class SecondaryService {
       } else if (q.includes('financial') || q.includes('revenue') || q.includes('report') || q.includes('statement')) {
         responseText = `Financial Metrics: Live double-entry accounting records are active. Total overdue rent outstanding is $${overdueTotalAmount} across ${overduePaymentsCount} delinquent accounts.`;
       } else {
-        responseText = `Hello! I am your WhatsLandlord AI Assistant.\n\nYour Portfolio Status:\n- Properties: ${propertiesCount}\n- Total Units: ${totalUnitsCount} (${occupancyRateVal}% occupied, ${vacantUnitsCount} vacant)\n- Active Tenants: ${tenantsCount}\n- Registered Owners: ${ownersCount}\n- Open Work Orders: ${workOrdersCount}\n\nHow can I further assist you with your property management operations?`;
+        responseText = `Hello! I am your Avenix Code Software Technology AI Assistant.\n\nYour Portfolio Status:\n- Properties: ${propertiesCount}\n- Total Units: ${totalUnitsCount} (${occupancyRateVal}% occupied, ${vacantUnitsCount} vacant)\n- Active Tenants: ${tenantsCount}\n- Registered Owners: ${ownersCount}\n- Open Work Orders: ${workOrdersCount}\n\nHow can I further assist you with your property management operations?`;
       }
     }
 

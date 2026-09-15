@@ -5,34 +5,15 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting WhatsLandlord ERP Database Seeding...');
 
-  // Clean up existing data to ensure idempotent seed runs
+  // Disable FK checks for seamless seeding across remote proxy
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
-  await prisma.inspectionPhoto.deleteMany({});
-  await prisma.inspectionItem.deleteMany({});
-  await prisma.inspectionRoom.deleteMany({});
-  await prisma.inspection.deleteMany({});
-  await prisma.moveIn.deleteMany({});
-  await prisma.inspectionTemplateItem.deleteMany({});
-  await prisma.inspectionTemplateRoom.deleteMany({});
-  await prisma.inspectionTemplate.deleteMany({});
-  await prisma.rentPayment.deleteMany({});
-  await prisma.lease.deleteMany({});
-  await prisma.unit.deleteMany({});
-  await prisma.building.deleteMany({});
-  await prisma.property.deleteMany({});
-  await prisma.owner.deleteMany({});
-  await prisma.user.deleteMany({});
-  await prisma.company.deleteMany({});
-  await prisma.serviceRequest.deleteMany({});
-  await prisma.workOrder.deleteMany({});
-  await prisma.screeningReport.deleteMany({});
-  await prisma.violation.deleteMany({});
-  await prisma.invoice.deleteMany({});
-  await prisma.coAAccount.deleteMany({});
-  await prisma.bankAccount.deleteMany({});
-  await prisma.vendor.deleteMany({});
-  await prisma.application.deleteMany({});
-  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
+  await prisma.$executeRawUnsafe('DELETE FROM permissions;');
+  await prisma.$executeRawUnsafe('DELETE FROM users;');
+  await prisma.$executeRawUnsafe('DELETE FROM companies;');
+  await prisma.$executeRawUnsafe('DELETE FROM roles;');
+  await prisma.$executeRawUnsafe('DELETE FROM properties;');
+  await prisma.$executeRawUnsafe('DELETE FROM units;');
+  await prisma.$executeRawUnsafe('DELETE FROM leases;');
 
   // 1. Create Roles
   const adminRole = await prisma.role.upsert({
@@ -524,6 +505,7 @@ async function main() {
     ],
   });
 
+  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
   console.log('🌱 Scoped seeding completed successfully!');
 }
 

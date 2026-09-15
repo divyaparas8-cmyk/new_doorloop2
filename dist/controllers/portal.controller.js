@@ -336,7 +336,7 @@ class PortalController {
             const initialMessage = JSON.stringify([
                 {
                     id: `msg-${Date.now()}`,
-                    senderName: 'WhatsLandlord AI System',
+                    senderName: 'Avenix Code Software Technology AI System',
                     role: 'System',
                     text: `Ticket automatically categorized as '${category}' and assigned to ${assignedVendorName} (${assignedTechnician}). Contractor notified.`,
                     timestamp: new Date().toLocaleString(),
@@ -2773,7 +2773,7 @@ Active Lease Overview:
                             messages: [
                                 {
                                     role: 'system',
-                                    content: `You are the official 24/7 AI Lease Assistant for WhatsLandlord Property Management. Answer the resident's question accurately, warmly, and concisely (under 80 words) based strictly on their signed lease agreement context:\n\n${leaseSummaryText}`,
+                                    content: `You are the official 24/7 AI Lease Assistant for Avenix Code Software Technology Property Management. Answer the resident's question accurately, warmly, and concisely (under 80 words) based strictly on their signed lease agreement context:\n\n${leaseSummaryText}`,
                                 },
                                 { role: 'user', content: question },
                             ],
@@ -2887,7 +2887,7 @@ Tenant Portal Context:
                             messages: [
                                 {
                                     role: 'system',
-                                    content: `You are the official 24/7 AI Tenant Concierge assistant for WhatsLandlord. Help the resident warmly, clearly, and concisely (under 75 words) based on their live real-time account data:\n\n${tenantContextText}`,
+                                    content: `You are the official 24/7 AI Tenant Concierge assistant for Avenix Code Software Technology. Help the resident warmly, clearly, and concisely (under 75 words) based on their live real-time account data:\n\n${tenantContextText}`,
                                 },
                                 { role: 'user', content: message },
                             ],

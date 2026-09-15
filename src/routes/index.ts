@@ -33,7 +33,7 @@ const router = Router();
 router.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    service: 'WhatsLandlord ERP Backend',
+    service: 'Avenix Code Software Technology ERP Backend',
     timestamp: new Date().toISOString(),
   });
 });
