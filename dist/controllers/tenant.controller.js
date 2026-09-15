@@ -86,11 +86,17 @@ class TenantController {
                 },
             });
             if (password) {
-                let role = await database_js_1.default.role.findUnique({
+                let role = await database_js_1.default.role.findFirst({
                     where: { name: 'Tenant' },
                 });
                 if (!role) {
-                    role = await database_js_1.default.role.findFirst();
+                    const allRoles = await database_js_1.default.role.findMany();
+                    role = allRoles.find((r) => r.name.toLowerCase() === 'tenant');
+                }
+                if (!role) {
+                    role = await database_js_1.default.role.create({
+                        data: { name: 'Tenant', description: 'Tenant Role' },
+                    });
                 }
                 if (role) {
                     const passwordHash = await bcrypt_1.default.hash(password, 12);
@@ -216,11 +222,17 @@ class TenantController {
                     });
                 }
                 else {
-                    let role = await database_js_1.default.role.findUnique({
+                    let role = await database_js_1.default.role.findFirst({
                         where: { name: 'Tenant' },
                     });
                     if (!role) {
-                        role = await database_js_1.default.role.findFirst();
+                        const allRoles = await database_js_1.default.role.findMany();
+                        role = allRoles.find((r) => r.name.toLowerCase() === 'tenant');
+                    }
+                    if (!role) {
+                        role = await database_js_1.default.role.create({
+                            data: { name: 'Tenant', description: 'Tenant Role' },
+                        });
                     }
                     if (role) {
                         await database_js_1.default.user.create({

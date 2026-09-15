@@ -108,11 +108,17 @@ export class TenantController {
       });
 
       if (password) {
-        let role = await prisma.role.findUnique({
+        let role = await prisma.role.findFirst({
           where: { name: 'Tenant' },
         });
         if (!role) {
-          role = await prisma.role.findFirst() as any;
+          const allRoles = await prisma.role.findMany();
+          role = allRoles.find((r) => r.name.toLowerCase() === 'tenant') as any;
+        }
+        if (!role) {
+          role = await prisma.role.create({
+            data: { name: 'Tenant', description: 'Tenant Role' },
+          });
         }
         if (role) {
           const passwordHash = await bcrypt.hash(password, 12);
@@ -263,11 +269,17 @@ export class TenantController {
             },
           });
         } else {
-          let role = await prisma.role.findUnique({
+          let role = await prisma.role.findFirst({
             where: { name: 'Tenant' },
           });
           if (!role) {
-            role = await prisma.role.findFirst() as any;
+            const allRoles = await prisma.role.findMany();
+            role = allRoles.find((r) => r.name.toLowerCase() === 'tenant') as any;
+          }
+          if (!role) {
+            role = await prisma.role.create({
+              data: { name: 'Tenant', description: 'Tenant Role' },
+            });
           }
           if (role) {
             await prisma.user.create({
