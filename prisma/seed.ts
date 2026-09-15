@@ -185,10 +185,10 @@ async function main() {
   });
 
   // 4. Create Users matching frontend login credentials and scoped by Company
-  const passwordHash = '$2b$12$OJZe0UwVTCpj0t6tfk0PNObncvFBfgPpCyXUYi5G0GVkWavbpyicy'; // password: 'admin123'
+  const passwordHash = '$2b$12$.7Eltwn3P5WSIRFXyufxBO6rd3iBHTCldIRISybV7tO5h/o7Zq0Ee'; // password: 'admin123'
   
   // Apex Users
-  const passwordHash123456 = '$2b$12$yN5vV7kzWQ5r3wuEZU3gZ.2bYVUYVF7GeErP6llEECZdCZw04htgi'; // password: '123456'
+  const passwordHash123456 = '$2b$12$40JauO0pCs/qcnmGiUv/3.pHpsCYU5Ah9ZmTZV2Z1PvMvFqPAHt.u'; // password: '123456'
   await prisma.user.upsert({
     where: { email: 'admin@apexpm.com' },
     update: { roleId: adminRole.id, companyId: apex.id, passwordHash: passwordHash123456 },
