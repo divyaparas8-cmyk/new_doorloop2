@@ -86,7 +86,37 @@ async function main() {
     });
   }
 
-  console.log(`Preserved Super Admin User: ${superAdminUser.email} (${superAdminUser.id})`);
+  // 6. Ensure Property Manager User exists (Property@gmail.com / 123456)
+  const managerEmail = 'Property@gmail.com';
+  const managerPasswordHash = await bcrypt.hash('123456', 12);
+
+  let managerUser = await prisma.user.findUnique({
+    where: { email: managerEmail },
+  });
+
+  if (managerUser) {
+    await prisma.user.update({
+      where: { id: managerUser.id },
+      data: {
+        passwordHash: managerPasswordHash,
+        roleId: managerRole.id,
+        status: 'Active',
+      },
+    });
+  } else {
+    managerUser = await prisma.user.create({
+      data: {
+        email: managerEmail,
+        passwordHash: managerPasswordHash,
+        firstName: 'Property',
+        lastName: 'Manager',
+        roleId: managerRole.id,
+        status: 'Active',
+      },
+    });
+  }
+
+  console.log(`Preserved Users: ${superAdminUser.email}, ${managerUser.email}`);
 
   // 6. Delete all transactional and company data (preserving Super Admin user and role)
   console.log('Clearing dependent tables...');
@@ -95,11 +125,13 @@ async function main() {
   try { await prisma.tenantNotification.deleteMany({}); } catch (e) {}
   try { await prisma.notification.deleteMany({}); } catch (e) {}
   try { await prisma.auditLog.deleteMany({}); } catch (e) {}
-  try { await prisma.screeningCheck.deleteMany({}); } catch (e) {}
+  try { await prisma.screeningReport.deleteMany({}); } catch (e) {}
+  try { await (prisma as any).screeningCheck?.deleteMany?.({}); } catch (e) {}
   try { await prisma.inspection.deleteMany({}); } catch (e) {}
   try { await prisma.maintenanceRequest.deleteMany({}); } catch (e) {}
   try { await prisma.workOrder.deleteMany({}); } catch (e) {}
-  try { await prisma.payment.deleteMany({}); } catch (e) {}
+  try { await prisma.rentPayment.deleteMany({}); } catch (e) {}
+  try { await (prisma as any).payment?.deleteMany?.({}); } catch (e) {}
   try { await prisma.invoice.deleteMany({}); } catch (e) {}
   try { await prisma.lease.deleteMany({}); } catch (e) {}
   try { await prisma.tenant.deleteMany({}); } catch (e) {}
@@ -111,10 +143,10 @@ async function main() {
   try { await prisma.vendor.deleteMany({}); } catch (e) {}
   try { await prisma.document.deleteMany({}); } catch (e) {}
 
-  // Delete all users except Super Admin
+  // Delete all users except Super Admin & Property Manager
   const deletedUsers = await prisma.user.deleteMany({
     where: {
-      id: { not: superAdminUser.id },
+      id: { notIn: [superAdminUser.id, managerUser.id] },
     },
   });
   console.log(`Deleted ${deletedUsers.count} non-Super Admin users.`);
