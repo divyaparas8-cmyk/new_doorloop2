@@ -9,6 +9,7 @@ const apiResponse_js_1 = require("../utils/apiResponse.js");
 const appError_js_1 = require("../utils/appError.js");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const cloudinary_js_1 = __importDefault(require("../config/cloudinary.js"));
+const secondary_service_js_1 = require("../services/secondary.service.js");
 const companyHelper_js_1 = require("../utils/companyHelper.js");
 class TenantController {
     async getAll(req, res, next) {
@@ -85,6 +86,13 @@ class TenantController {
                     currentAddress: currentAddress || null,
                 },
             });
+            secondary_service_js_1.secondaryService.createNotification({
+                title: 'New Tenant Registered',
+                message: `Tenant ${firstName || ''} ${lastName || ''}`.trim() + ' has been registered.',
+                type: 'success',
+                companyId,
+                targetId: tenant.id,
+            }).catch(console.error);
             if (password) {
                 let role = await database_js_1.default.role.findFirst({
                     where: { name: 'Tenant' },

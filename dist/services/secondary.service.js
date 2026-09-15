@@ -56,15 +56,42 @@ class SecondaryService {
             },
         });
     }
+    // Helper to create notifications
+    async createNotification(data) {
+        try {
+            return await database_1.default.notification.create({
+                data: {
+                    title: data.title,
+                    message: data.message,
+                    type: data.type || 'info',
+                    role: data.role || undefined,
+                    companyId: data.companyId || undefined,
+                    targetId: data.targetId || undefined,
+                },
+            });
+        }
+        catch (err) {
+            console.warn('Failed to create notification:', err);
+        }
+    }
     // Notifications
     async getNotifications(companyId, role) {
-        const whereClause = companyId ? { companyId } : {};
-        if (role) {
-            whereClause.role = role;
+        if (!companyId) {
+            // Super Admin or Global
+            return database_1.default.notification.findMany({
+                orderBy: { createdAt: 'desc' },
+                take: 50,
+            });
         }
         return database_1.default.notification.findMany({
-            where: whereClause,
+            where: {
+                OR: [
+                    { companyId },
+                    { companyId: null },
+                ],
+            },
             orderBy: { createdAt: 'desc' },
+            take: 50,
         });
     }
     async markNotificationRead(id) {

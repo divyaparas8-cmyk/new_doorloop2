@@ -3,6 +3,7 @@ import prisma from '../config/database.js';
 import { sendSuccess } from '../utils/apiResponse.js';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 import bcrypt from 'bcrypt';
+import { secondaryService } from '../services/secondary.service.js';
 import { getManagerCompanyId } from '../utils/companyHelper.js';
 import { AppError } from '../utils/appError.js';
 
@@ -49,6 +50,14 @@ export class OwnerController {
           companyId,
         },
       });
+
+      secondaryService.createNotification({
+        title: 'New Owner Added',
+        message: `Owner ${resolvedName} has been registered.`,
+        type: 'info',
+        companyId,
+        targetId: owner.id,
+      }).catch(console.error);
 
       if (Array.isArray(propertiesOwned) && propertiesOwned.length > 0) {
         await prisma.property.updateMany({

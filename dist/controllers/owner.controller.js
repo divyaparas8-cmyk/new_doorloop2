@@ -7,6 +7,7 @@ exports.ownerController = exports.OwnerController = void 0;
 const database_js_1 = __importDefault(require("../config/database.js"));
 const apiResponse_js_1 = require("../utils/apiResponse.js");
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const secondary_service_js_1 = require("../services/secondary.service.js");
 const companyHelper_js_1 = require("../utils/companyHelper.js");
 const appError_js_1 = require("../utils/appError.js");
 class OwnerController {
@@ -49,6 +50,13 @@ class OwnerController {
                     companyId,
                 },
             });
+            secondary_service_js_1.secondaryService.createNotification({
+                title: 'New Owner Added',
+                message: `Owner ${resolvedName} has been registered.`,
+                type: 'info',
+                companyId,
+                targetId: owner.id,
+            }).catch(console.error);
             if (Array.isArray(propertiesOwned) && propertiesOwned.length > 0) {
                 await database_js_1.default.property.updateMany({
                     where: { id: { in: propertiesOwned } },

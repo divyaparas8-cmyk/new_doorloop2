@@ -1,123 +1,136 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from './config/database.js';
 import bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
-
 async function main() {
-  console.log('🧹 Starting database clear...');
+  console.log('Cleaning up database while preserving Super Admin...');
 
-  // 1. Disable FK checks
-  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
-
-  // 2. Fetch all tables from the database
-  const tables: { TABLE_NAME: string }[] = await prisma.$queryRawUnsafe(
-    `SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'`
-  );
-
-  // 3. Delete from all tables except migration history
-  for (const table of tables) {
-    const tableName = table.TABLE_NAME;
-    if (tableName === '_prisma_migrations') continue;
-    console.log(`Clearing table: ${tableName}`);
-    await prisma.$executeRawUnsafe(`DELETE FROM \`${tableName}\`;`);
-  }
-
-  // 4. Enable FK checks
-  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
-  console.log('✅ Database cleared.');
-
-  // 5. Create/Ensure default Roles exist
-  const adminRole = await prisma.role.upsert({
+  // 1. Ensure Super Admin role exists
+  let superAdminRole = await prisma.role.findFirst({
     where: { name: 'Super Admin' },
-    update: {},
-    create: {
-      name: 'Super Admin',
-      description: 'Master account with full administrative permissions.',
-      isCustom: false,
-    },
   });
-
-  const roles = [
-    { name: 'Property Manager', description: 'Property manager access with operational permissions.', isCustom: false },
-    { name: 'Owner', description: 'Owner access to financial statements and payouts.', isCustom: false },
-    { name: 'Tenant', description: 'Tenant portal access for rent payments and maintenance.', isCustom: false },
-    { name: 'Maintenance Staff', description: 'Maintenance dispatcher and tech access.', isCustom: false },
-    { name: 'Collection Manager', description: 'Collection manager access.', isCustom: false },
-  ];
-
-  for (const r of roles) {
-    await prisma.role.upsert({
-      where: { name: r.name },
-      update: {},
-      create: r,
-    });
-  }
-
-  // 6. Create default permissions for Super Admin
-  const modules = [
-    'Dashboard',
-    'Properties',
-    'Leasing',
-    'Tenants',
-    'Owners',
-    'Rent & Payments',
-    'Accounting',
-    'Maintenance',
-    'Documents',
-    'Reports',
-    'Communication',
-    'Company Settings',
-  ];
-
-  for (const moduleName of modules) {
-    await prisma.permission.upsert({
-      where: {
-        roleId_module: {
-          roleId: adminRole.id,
-          module: moduleName,
-        },
-      },
-      update: {},
-      create: {
-        roleId: adminRole.id,
-        module: moduleName,
-        canView: true,
-        canCreate: true,
-        canEdit: true,
-        canDelete: true,
-        canApprove: true,
-        canExport: true,
+  if (!superAdminRole) {
+    superAdminRole = await prisma.role.create({
+      data: {
+        name: 'Super Admin',
+        description: 'Super Administrator with full system access',
       },
     });
   }
 
-  // 7. Hash password and create/update Super Admin User
-  const passwordHash = await bcrypt.hash('whatslandlord@123', 12);
-  await prisma.user.upsert({
-    where: { email: 'superadmin@whatslandlord.com' },
-    update: {
-      passwordHash,
-      firstName: 'Super',
-      lastName: 'Admin',
-      roleId: adminRole.id,
-      status: 'Active',
-    },
-    create: {
-      email: 'superadmin@whatslandlord.com',
-      passwordHash,
-      firstName: 'Super',
-      lastName: 'Admin',
-      roleId: adminRole.id,
-      status: 'Active',
-    },
+  // 2. Ensure Property Manager role exists
+  let managerRole = await prisma.role.findFirst({
+    where: { name: 'Property Manager' },
+  });
+  if (!managerRole) {
+    managerRole = await prisma.role.create({
+      data: {
+        name: 'Property Manager',
+        description: 'Property Manager role',
+      },
+    });
+  }
+
+  // 3. Ensure Tenant role exists
+  let tenantRole = await prisma.role.findFirst({
+    where: { name: 'Tenant' },
+  });
+  if (!tenantRole) {
+    tenantRole = await prisma.role.create({
+      data: {
+        name: 'Tenant',
+        description: 'Tenant role',
+      },
+    });
+  }
+
+  // 4. Ensure Owner role exists
+  let ownerRole = await prisma.role.findFirst({
+    where: { name: 'Owner' },
+  });
+  if (!ownerRole) {
+    ownerRole = await prisma.role.create({
+      data: {
+        name: 'Owner',
+        description: 'Owner role',
+      },
+    });
+  }
+
+  // 5. Ensure Super Admin User exists
+  const superAdminEmail = 'admin@apexpm.com';
+  const superAdminPasswordHash = await bcrypt.hash('123456', 12);
+
+  let superAdminUser = await prisma.user.findUnique({
+    where: { email: superAdminEmail },
   });
 
-  console.log('🚀 Super Admin created successfully!');
+  if (superAdminUser) {
+    await prisma.user.update({
+      where: { id: superAdminUser.id },
+      data: {
+        passwordHash: superAdminPasswordHash,
+        roleId: superAdminRole.id,
+        status: 'Active',
+      },
+    });
+  } else {
+    superAdminUser = await prisma.user.create({
+      data: {
+        email: superAdminEmail,
+        passwordHash: superAdminPasswordHash,
+        firstName: 'Super',
+        lastName: 'Admin',
+        roleId: superAdminRole.id,
+        status: 'Active',
+      },
+    });
+  }
+
+  console.log(`Preserved Super Admin User: ${superAdminUser.email} (${superAdminUser.id})`);
+
+  // 6. Delete all transactional and company data (preserving Super Admin user and role)
+  console.log('Clearing dependent tables...');
+  
+  try { await prisma.userAssignment.deleteMany({}); } catch (e) {}
+  try { await prisma.tenantNotification.deleteMany({}); } catch (e) {}
+  try { await prisma.notification.deleteMany({}); } catch (e) {}
+  try { await prisma.auditLog.deleteMany({}); } catch (e) {}
+  try { await prisma.screeningCheck.deleteMany({}); } catch (e) {}
+  try { await prisma.inspection.deleteMany({}); } catch (e) {}
+  try { await prisma.maintenanceRequest.deleteMany({}); } catch (e) {}
+  try { await prisma.workOrder.deleteMany({}); } catch (e) {}
+  try { await prisma.payment.deleteMany({}); } catch (e) {}
+  try { await prisma.invoice.deleteMany({}); } catch (e) {}
+  try { await prisma.lease.deleteMany({}); } catch (e) {}
+  try { await prisma.tenant.deleteMany({}); } catch (e) {}
+  try { await prisma.unit.deleteMany({}); } catch (e) {}
+  try { await prisma.building.deleteMany({}); } catch (e) {}
+  try { await prisma.ownerDistribution.deleteMany({}); } catch (e) {}
+  try { await prisma.property.deleteMany({}); } catch (e) {}
+  try { await prisma.owner.deleteMany({}); } catch (e) {}
+  try { await prisma.vendor.deleteMany({}); } catch (e) {}
+  try { await prisma.document.deleteMany({}); } catch (e) {}
+
+  // Delete all users except Super Admin
+  const deletedUsers = await prisma.user.deleteMany({
+    where: {
+      id: { not: superAdminUser.id },
+    },
+  });
+  console.log(`Deleted ${deletedUsers.count} non-Super Admin users.`);
+
+  // Delete all companies
+  try {
+    const deletedCompanies = await prisma.company.deleteMany({});
+    console.log(`Deleted ${deletedCompanies.count} companies.`);
+  } catch (e) {}
+
+  console.log('Database successfully cleared! Only Super Admin remains.');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Failed:', e);
+    console.error('Error clearing database:', e);
     process.exit(1);
   })
   .finally(async () => {

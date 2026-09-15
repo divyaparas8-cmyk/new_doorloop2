@@ -148,6 +148,7 @@ class SuperAdminService {
                     message: `${company.name} registered on the platform (${planName}).`,
                     type: 'success',
                     role: 'Super Admin',
+                    companyId: company.id,
                     targetId: company.id,
                 },
             });

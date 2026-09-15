@@ -58,15 +58,50 @@ export class SecondaryService {
     });
   }
 
+  // Helper to create notifications
+  async createNotification(data: {
+    title: string;
+    message: string;
+    type?: 'info' | 'success' | 'warning' | 'error';
+    role?: string;
+    companyId?: string | null;
+    targetId?: string | null;
+  }) {
+    try {
+      return await prisma.notification.create({
+        data: {
+          title: data.title,
+          message: data.message,
+          type: data.type || 'info',
+          role: data.role || undefined,
+          companyId: data.companyId || undefined,
+          targetId: data.targetId || undefined,
+        },
+      });
+    } catch (err) {
+      console.warn('Failed to create notification:', err);
+    }
+  }
+
   // Notifications
   async getNotifications(companyId?: string, role?: string) {
-    const whereClause: any = companyId ? { companyId } : {};
-    if (role) {
-      whereClause.role = role;
+    if (!companyId) {
+      // Super Admin or Global
+      return prisma.notification.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
     }
+
     return prisma.notification.findMany({
-      where: whereClause,
+      where: {
+        OR: [
+          { companyId },
+          { companyId: null },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 

@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 import { AppError } from '../utils/appError.js';
 import bcrypt from 'bcrypt';
 import cloudinary from '../config/cloudinary.js';
+import { secondaryService } from '../services/secondary.service.js';
 import { getManagerCompanyId } from '../utils/companyHelper.js';
 
 export class TenantController {
@@ -106,6 +107,14 @@ export class TenantController {
           currentAddress: currentAddress || null,
         },
       });
+
+      secondaryService.createNotification({
+        title: 'New Tenant Registered',
+        message: `Tenant ${firstName || ''} ${lastName || ''}`.trim() + ' has been registered.',
+        type: 'success',
+        companyId,
+        targetId: tenant.id,
+      }).catch(console.error);
 
       if (password) {
         let role = await prisma.role.findFirst({
