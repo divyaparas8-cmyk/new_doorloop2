@@ -572,6 +572,26 @@ export class SuperAdminService {
     });
   }
 
+  async updatePlan(id: string, data: any) {
+    return prisma.saaSPlan.update({
+      where: { id },
+      data: {
+        name: data.name,
+        price: data.price !== undefined ? parseFloat(data.price as any) : undefined,
+        billingCycle: data.billingCycle,
+        maxProperties: data.maxProperties !== undefined ? parseInt(data.maxProperties as any) : undefined,
+        maxUnits: data.maxUnits !== undefined ? parseInt(data.maxUnits as any) : undefined,
+        features: data.features,
+      },
+    });
+  }
+
+  async deletePlan(id: string) {
+    return prisma.saaSPlan.delete({
+      where: { id },
+    });
+  }
+
   // SaaS Invoices
   async getInvoices() {
     return prisma.saaSInvoice.findMany({

@@ -509,6 +509,24 @@ class SuperAdminService {
             },
         });
     }
+    async updatePlan(id, data) {
+        return database_1.default.saaSPlan.update({
+            where: { id },
+            data: {
+                name: data.name,
+                price: data.price !== undefined ? parseFloat(data.price) : undefined,
+                billingCycle: data.billingCycle,
+                maxProperties: data.maxProperties !== undefined ? parseInt(data.maxProperties) : undefined,
+                maxUnits: data.maxUnits !== undefined ? parseInt(data.maxUnits) : undefined,
+                features: data.features,
+            },
+        });
+    }
+    async deletePlan(id) {
+        return database_1.default.saaSPlan.delete({
+            where: { id },
+        });
+    }
     // SaaS Invoices
     async getInvoices() {
         return database_1.default.saaSInvoice.findMany({

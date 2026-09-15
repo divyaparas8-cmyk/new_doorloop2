@@ -125,6 +125,24 @@ export class SuperAdminController {
     }
   }
 
+  async updatePlan(req: Request, res: Response, next: NextFunction) {
+    try {
+      const plan = await superAdminService.updatePlan(req.params.id as string, req.body);
+      return sendSuccess({ res, data: plan });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deletePlan(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await superAdminService.deletePlan(req.params.id as string);
+      return sendSuccess({ res, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Invoices
   async getInvoices(req: Request, res: Response, next: NextFunction) {
     try {
