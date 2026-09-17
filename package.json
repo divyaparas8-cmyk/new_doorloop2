@@ -1,7 +1,7 @@
 {
-  "name": "whatslandlord-backend",
+  "name": "avenixcode-backend",
   "version": "1.0.0",
-  "description": "WhatsLandlord Property Management ERP Backend Service",
+  "description": "Avenix Code Property Management ERP Backend Service",
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {

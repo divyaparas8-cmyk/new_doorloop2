@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting WhatsLandlord ERP Database Seeding...');
+  console.log('🌱 Starting Avenix Code ERP Database Seeding...');
 
   // Disable FK checks for seamless seeding across remote proxy
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
