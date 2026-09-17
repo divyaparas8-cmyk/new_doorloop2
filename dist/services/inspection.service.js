@@ -78,11 +78,9 @@ class InspectionService {
             throw new Error('Inspection template not found');
         if (!template.active)
             throw new Error('Inspection template is inactive');
-        // Generate unique inspection number, e.g. MI-123456
-        const count = await database_1.default.inspection.count();
-        const formattedCount = String(count + 1).padStart(6, '0');
+        // Generate unique inspection number, e.g. MI-12345678
         const prefix = template.type === 'MOVE_OUT' ? 'MO' : 'MI';
-        const inspectionNumber = `${prefix}-${formattedCount}`;
+        const inspectionNumber = `${prefix}-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
         return database_1.default.$transaction(async (tx) => {
             // 1. Update MoveIn status
             await tx.moveIn.update({

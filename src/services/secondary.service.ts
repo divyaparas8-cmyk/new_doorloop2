@@ -85,21 +85,16 @@ export class SecondaryService {
 
   // Notifications
   async getNotifications(companyId?: string, role?: string) {
-    if (!companyId) {
-      // Super Admin or Global
-      return prisma.notification.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      });
+    const whereClause: any = {};
+    if (companyId) {
+      whereClause.companyId = companyId;
+    }
+    if (role) {
+      whereClause.role = role;
     }
 
     return prisma.notification.findMany({
-      where: {
-        OR: [
-          { companyId },
-          { companyId: null },
-        ],
-      },
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       take: 50,
     });

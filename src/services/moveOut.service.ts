@@ -142,8 +142,7 @@ export class MoveOutService {
     if (!template) throw new Error('Inspection template not found');
 
     // Generate inspection number
-    const count = await prisma.inspection.count();
-    const inspectionNumber = `MO-${String(count + 1).padStart(6, '0')}`;
+    const inspectionNumber = `MO-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
 
     return prisma.$transaction(async (tx) => {
       // 1. Create inspection snapshot

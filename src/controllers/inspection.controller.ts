@@ -22,13 +22,10 @@ export class InspectionController {
     try {
       const companyId = req.user?.companyId;
       const { status, date, templateName } = req.body;
-      const count = await prisma.inspection.count({
-        where: companyId ? { companyId } : {},
-      });
-      const formattedCount = String(count + 1).padStart(6, '0');
+      const inspectionNumber = `MI-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
       const inspection = await prisma.inspection.create({
         data: {
-          inspectionNumber: `MI-${formattedCount}`,
+          inspectionNumber,
           status: (status as any) || 'DRAFT',
           startedAt: date ? new Date(date) : new Date(),
           templateName: templateName || 'Standard Template',

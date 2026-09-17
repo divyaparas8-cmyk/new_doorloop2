@@ -73,11 +73,9 @@ export class InspectionService {
     if (!template) throw new Error('Inspection template not found');
     if (!template.active) throw new Error('Inspection template is inactive');
 
-    // Generate unique inspection number, e.g. MI-123456
-    const count = await prisma.inspection.count();
-    const formattedCount = String(count + 1).padStart(6, '0');
+    // Generate unique inspection number, e.g. MI-12345678
     const prefix = template.type === 'MOVE_OUT' ? 'MO' : 'MI';
-    const inspectionNumber = `${prefix}-${formattedCount}`;
+    const inspectionNumber = `${prefix}-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
 
     return prisma.$transaction(
       async (tx) => {

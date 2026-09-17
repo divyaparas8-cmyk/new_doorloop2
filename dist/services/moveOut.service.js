@@ -141,8 +141,7 @@ class MoveOutService {
         if (!template)
             throw new Error('Inspection template not found');
         // Generate inspection number
-        const count = await database_1.default.inspection.count();
-        const inspectionNumber = `MO-${String(count + 1).padStart(6, '0')}`;
+        const inspectionNumber = `MO-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
         return database_1.default.$transaction(async (tx) => {
             // 1. Create inspection snapshot
             const inspection = await tx.inspection.create({

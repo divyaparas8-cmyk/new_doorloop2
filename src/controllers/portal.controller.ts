@@ -1884,35 +1884,23 @@ export class PortalController {
 
   async getTenantNotifications(req: Request, res: Response, next: NextFunction) {
     try {
-      let notes = await prisma.tenantNotification.findMany({
+      const reqAuth = req as AuthenticatedRequest;
+      const companyId = reqAuth.user?.companyId;
+      const tenantEmail = reqAuth.user?.email;
+      let tenantId: string | undefined;
+      if (tenantEmail) {
+        const tenant = await prisma.tenant.findFirst({ where: { email: tenantEmail } });
+        if (tenant) tenantId = tenant.id;
+      }
+
+      const whereClause: any = {};
+      if (tenantId) whereClause.tenantId = tenantId;
+      if (companyId) whereClause.companyId = companyId;
+
+      const notes = await prisma.tenantNotification.findMany({
+        where: whereClause,
         orderBy: { createdAt: 'desc' },
       });
-
-      if (notes.length === 0) {
-        await prisma.tenantNotification.createMany({
-          data: [
-            {
-              title: 'Monthly Rent Statement Ready',
-              message: 'Your monthly rent invoice for August 2026 is available for download.',
-              type: 'info',
-            },
-            {
-              title: 'Maintenance Request Scheduled',
-              message: 'Work order #WO-1042 for HVAC repair is assigned for Thursday at 10 AM.',
-              type: 'success',
-            },
-            {
-              title: 'Package Arrived at Front Desk',
-              message: 'A parcel from Amazon Logistics is waiting at reception.',
-              type: 'warning',
-            },
-          ],
-        });
-
-        notes = await prisma.tenantNotification.findMany({
-          orderBy: { createdAt: 'desc' },
-        });
-      }
 
       const formatted = notes.map((n: any) => ({
         id: n.id,
@@ -2441,11 +2429,10 @@ export class PortalController {
   async createInspection(req: Request, res: Response, next: NextFunction) {
     try {
       const { status, date } = req.body;
-      const count = await prisma.inspection.count();
-      const formattedCount = String(count + 1).padStart(6, '0');
+      const inspectionNumber = `MI-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
       const inspection = await prisma.inspection.create({
         data: {
-          inspectionNumber: `MI-${formattedCount}`,
+          inspectionNumber,
           status: (status as any) || 'DRAFT',
           startedAt: date ? new Date(date) : new Date(),
           templateName: 'Standard Template',

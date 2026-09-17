@@ -76,20 +76,15 @@ class SecondaryService {
     }
     // Notifications
     async getNotifications(companyId, role) {
-        if (!companyId) {
-            // Super Admin or Global
-            return database_1.default.notification.findMany({
-                orderBy: { createdAt: 'desc' },
-                take: 50,
-            });
+        const whereClause = {};
+        if (companyId) {
+            whereClause.companyId = companyId;
+        }
+        if (role) {
+            whereClause.role = role;
         }
         return database_1.default.notification.findMany({
-            where: {
-                OR: [
-                    { companyId },
-                    { companyId: null },
-                ],
-            },
+            where: whereClause,
             orderBy: { createdAt: 'desc' },
             take: 50,
         });
