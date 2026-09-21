@@ -92,7 +92,10 @@ class InvoiceController {
   async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const { status, paidAmount, balance, notes } = req.body;
+      const {
+        tenantId, tenantName, propertyId, propertyName, unitNumber,
+        dueDate, amount, paidAmount, balance, status, lineItems, notes
+      } = req.body;
       const companyId = req.user?.companyId;
 
       if (companyId) {
@@ -102,14 +105,23 @@ class InvoiceController {
         if (!check) throw new Error('Invoice not found.');
       }
 
+      const updateData: any = {};
+      if (tenantId !== undefined) updateData.tenantId = tenantId;
+      if (tenantName !== undefined) updateData.tenantName = tenantName;
+      if (propertyId !== undefined) updateData.propertyId = propertyId;
+      if (propertyName !== undefined) updateData.propertyName = propertyName;
+      if (unitNumber !== undefined) updateData.unitNumber = unitNumber;
+      if (dueDate !== undefined) updateData.dueDate = typeof dueDate === 'string' ? dueDate : (new Date(dueDate).toISOString().split('T')[0]);
+      if (amount !== undefined) updateData.amount = parseFloat(amount);
+      if (paidAmount !== undefined) updateData.paidAmount = parseFloat(paidAmount);
+      if (balance !== undefined) updateData.balance = parseFloat(balance);
+      if (status !== undefined) updateData.status = status;
+      if (lineItems !== undefined) updateData.lineItems = typeof lineItems === 'string' ? lineItems : JSON.stringify(lineItems);
+      if (notes !== undefined) updateData.notes = notes;
+
       const invoice = await prisma.invoice.update({
         where: { id },
-        data: {
-          ...(status && { status }),
-          ...(paidAmount !== undefined && { paidAmount: parseFloat(paidAmount) }),
-          ...(balance !== undefined && { balance: parseFloat(balance) }),
-          ...(notes !== undefined && { notes }),
-        },
+        data: updateData,
       });
 
       return sendSuccess({
