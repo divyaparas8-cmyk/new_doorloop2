@@ -3,6 +3,8 @@ import prisma from '../config/database';
 import { getManagerCompanyId } from '../utils/companyHelper';
 import { authorizeNetService } from './authorizeNet.service';
 import { AppError } from '../utils/appError';
+import { ensureRole } from '../utils/roleHelper';
+import { cleanupUserByEmail, purgeOrphanedUserByEmail } from '../utils/userCleanupHelper';
 
 export class SuperAdminService {
   // Companies Directory
@@ -386,12 +388,18 @@ export class SuperAdminService {
   async createCompanyUser(data: { companyId?: string; name: string; email: string; role?: string; phone?: string; password?: string; serviceType?: string }) {
     let finalCompanyId = await getManagerCompanyId(undefined, data.companyId);
 
-    const existingUser = await prisma.user.findFirst({ where: { email: data.email.trim().toLowerCase() } });
+    if (data.email) {
+      await purgeOrphanedUserByEmail(prisma, data.email);
+    }
+
+    const cleanEmail = data.email.trim().toLowerCase();
+
+    const existingUser = await prisma.user.findFirst({ where: { email: cleanEmail } });
     if (existingUser) {
       throw new AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
     }
 
-    const existingCompanyUser = await prisma.companyUser.findFirst({ where: { email: data.email.trim().toLowerCase() } });
+    const existingCompanyUser = await prisma.companyUser.findFirst({ where: { email: cleanEmail } });
     if (existingCompanyUser) {
       throw new AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
     }
@@ -403,8 +411,8 @@ export class SuperAdminService {
     }
 
     // 1. Create or update companyUser record
-    let companyUser = await prisma.companyUser.findUnique({
-      where: { email: data.email },
+    let companyUser = await prisma.companyUser.findFirst({
+      where: { email: cleanEmail },
     });
 
     if (companyUser) {
@@ -422,17 +430,15 @@ export class SuperAdminService {
         data: {
           companyId: finalCompanyId,
           name: data.name,
-          email: data.email,
+          email: cleanEmail,
           role: mappedRole,
           status: 'Active',
         },
       });
     }
 
-    // 2. Fetch the corresponding Role record from DB
-    const roleObj = await prisma.role.findFirst({
-      where: { name: mappedRole },
-    });
+    // 2. Fetch or create the exact corresponding Role record from DB
+    const roleObj = await ensureRole(mappedRole);
 
     if (roleObj) {
       const passwordHash = await bcrypt.hash(data.password || 'staff123', 12);
@@ -441,8 +447,8 @@ export class SuperAdminService {
       const lastName = nameParts.slice(1).join(' ') || 'User';
 
       // 3. Create or update login user in users table
-      const existingUser = await prisma.user.findUnique({
-        where: { email: data.email },
+      const existingUser = await prisma.user.findFirst({
+        where: { email: cleanEmail },
       });
 
       if (existingUser) {
@@ -460,7 +466,7 @@ export class SuperAdminService {
       } else {
         await prisma.user.create({
           data: {
-            email: data.email,
+            email: cleanEmail,
             passwordHash,
             firstName,
             lastName,
@@ -475,7 +481,7 @@ export class SuperAdminService {
       // Automatically create matching Vendor record if the role is Maintenance Staff
       if (mappedRole === 'Maintenance Staff') {
         const existingVendor = await prisma.vendor.findFirst({
-          where: { email: data.email },
+          where: { email: cleanEmail },
         });
 
         if (!existingVendor) {
@@ -483,7 +489,7 @@ export class SuperAdminService {
             data: {
               companyName: data.name,
               contactName: data.name,
-              email: data.email,
+              email: cleanEmail,
               phone: data.phone || '',
               serviceType: data.serviceType || 'General Maintenance',
               rating: 5.0,
@@ -510,13 +516,13 @@ export class SuperAdminService {
     });
     return prisma.$transaction(async (tx) => {
       if (companyUser && companyUser.email) {
-        await tx.user.deleteMany({
-          where: { email: companyUser.email },
+        await cleanupUserByEmail(tx, companyUser.email);
+      } else if (companyUser) {
+        await tx.companyUser.delete({
+          where: { id },
         });
       }
-      return tx.companyUser.delete({
-        where: { id },
-      });
+      return { success: true };
     });
   }
 
@@ -668,7 +674,7 @@ export class SuperAdminService {
       const map: Record<string, string> = {
         systemName: 'Apex SaaS Platform',
         supportEmail: 'support@apexpm.com',
-        defaultCurrency: 'USD ($)',
+        defaultCurrency: 'EUR (€)',
         appTimezone: 'UTC (Coordinated Universal Time)',
         maintenanceMode: 'false',
       };
@@ -680,7 +686,7 @@ export class SuperAdminService {
       return {
         systemName: 'Apex SaaS Platform',
         supportEmail: 'support@apexpm.com',
-        defaultCurrency: 'USD ($)',
+        defaultCurrency: 'EUR (€)',
         appTimezone: 'UTC (Coordinated Universal Time)',
         maintenanceMode: 'false',
       };

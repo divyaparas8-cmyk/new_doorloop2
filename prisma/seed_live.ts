@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting Avenix Code Live Database Seeding...');
+  console.log('🌱 Starting Tab Property Live Database Seeding...');
 
   // 1. Clean old data safely with FK checks disabled
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');

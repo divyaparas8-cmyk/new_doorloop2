@@ -8,10 +8,12 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const database_1 = __importDefault(require("../config/database"));
 const jwt_1 = require("../utils/jwt");
 const appError_1 = require("../utils/appError");
+const roleHelper_1 = require("../utils/roleHelper");
 class AuthService {
     async login(email, pass) {
-        let user = await database_1.default.user.findUnique({
-            where: { email },
+        const cleanEmail = email.trim().toLowerCase();
+        let user = await database_1.default.user.findFirst({
+            where: { email: cleanEmail },
             include: { role: true, company: true },
         });
         if (!user) {
@@ -29,11 +31,44 @@ class AuthService {
         if (!isValidPassword) {
             throw new appError_1.AppError('Invalid credentials provided.', 401, 'INVALID_CREDENTIALS');
         }
+        // Role Auto-Correction Logic: Verify user's role against entity records
+        let expectedRoleName = user.role?.name;
+        const ownerRecord = await database_1.default.owner.findFirst({ where: { email: cleanEmail } });
+        const tenantRecord = await database_1.default.tenant.findFirst({ where: { email: cleanEmail } });
+        const vendorRecord = await database_1.default.vendor.findFirst({ where: { email: cleanEmail } });
+        const companyUserRecord = await database_1.default.companyUser.findFirst({ where: { email: cleanEmail } });
+        if (tenantRecord) {
+            expectedRoleName = 'Tenant';
+        }
+        else if (ownerRecord) {
+            expectedRoleName = 'Owner';
+        }
+        else if (vendorRecord) {
+            expectedRoleName = 'Maintenance Staff';
+        }
+        else if (companyUserRecord?.role) {
+            expectedRoleName = companyUserRecord.role === 'Maintenance' ? 'Maintenance Staff' : companyUserRecord.role;
+        }
+        else if (!expectedRoleName) {
+            expectedRoleName = user.companyId ? 'Property Manager' : 'Super Admin';
+        }
+        // If role name is mismatched or roleId is missing, repair it
+        if (expectedRoleName && user.role?.name !== expectedRoleName) {
+            const correctRole = await (0, roleHelper_1.ensureRole)(expectedRoleName);
+            if (correctRole && correctRole.id !== user.roleId) {
+                user = await database_1.default.user.update({
+                    where: { id: user.id },
+                    data: { roleId: correctRole.id },
+                    include: { role: true, company: true },
+                });
+            }
+        }
+        const resolvedRoleName = user.role?.name || expectedRoleName || 'Property Manager';
         const payload = {
             userId: user.id,
             email: user.email,
             roleId: user.roleId,
-            roleName: user.role?.name || 'Super Admin',
+            roleName: resolvedRoleName,
             companyId: user.companyId || undefined,
         };
         const accessToken = (0, jwt_1.generateAccessToken)(payload);
@@ -45,7 +80,7 @@ class AuthService {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 roleId: user.roleId,
-                roleName: user.role?.name || 'Super Admin',
+                roleName: resolvedRoleName,
                 companyId: user.companyId,
             },
             accessToken,

@@ -9,6 +9,8 @@ const database_1 = __importDefault(require("../config/database"));
 const companyHelper_1 = require("../utils/companyHelper");
 const authorizeNet_service_1 = require("./authorizeNet.service");
 const appError_1 = require("../utils/appError");
+const roleHelper_1 = require("../utils/roleHelper");
+const userCleanupHelper_1 = require("../utils/userCleanupHelper");
 class SuperAdminService {
     // Companies Directory
     async getCompanies() {
@@ -338,11 +340,15 @@ class SuperAdminService {
     }
     async createCompanyUser(data) {
         let finalCompanyId = await (0, companyHelper_1.getManagerCompanyId)(undefined, data.companyId);
-        const existingUser = await database_1.default.user.findFirst({ where: { email: data.email.trim().toLowerCase() } });
+        if (data.email) {
+            await (0, userCleanupHelper_1.purgeOrphanedUserByEmail)(database_1.default, data.email);
+        }
+        const cleanEmail = data.email.trim().toLowerCase();
+        const existingUser = await database_1.default.user.findFirst({ where: { email: cleanEmail } });
         if (existingUser) {
             throw new appError_1.AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
         }
-        const existingCompanyUser = await database_1.default.companyUser.findFirst({ where: { email: data.email.trim().toLowerCase() } });
+        const existingCompanyUser = await database_1.default.companyUser.findFirst({ where: { email: cleanEmail } });
         if (existingCompanyUser) {
             throw new appError_1.AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
         }
@@ -352,8 +358,8 @@ class SuperAdminService {
             mappedRole = 'Maintenance Staff';
         }
         // 1. Create or update companyUser record
-        let companyUser = await database_1.default.companyUser.findUnique({
-            where: { email: data.email },
+        let companyUser = await database_1.default.companyUser.findFirst({
+            where: { email: cleanEmail },
         });
         if (companyUser) {
             companyUser = await database_1.default.companyUser.update({
@@ -371,24 +377,22 @@ class SuperAdminService {
                 data: {
                     companyId: finalCompanyId,
                     name: data.name,
-                    email: data.email,
+                    email: cleanEmail,
                     role: mappedRole,
                     status: 'Active',
                 },
             });
         }
-        // 2. Fetch the corresponding Role record from DB
-        const roleObj = await database_1.default.role.findFirst({
-            where: { name: mappedRole },
-        });
+        // 2. Fetch or create the exact corresponding Role record from DB
+        const roleObj = await (0, roleHelper_1.ensureRole)(mappedRole);
         if (roleObj) {
             const passwordHash = await bcrypt_1.default.hash(data.password || 'staff123', 12);
             const nameParts = data.name.trim().split(/\s+/);
             const firstName = nameParts[0] || 'Staff';
             const lastName = nameParts.slice(1).join(' ') || 'User';
             // 3. Create or update login user in users table
-            const existingUser = await database_1.default.user.findUnique({
-                where: { email: data.email },
+            const existingUser = await database_1.default.user.findFirst({
+                where: { email: cleanEmail },
             });
             if (existingUser) {
                 await database_1.default.user.update({
@@ -406,7 +410,7 @@ class SuperAdminService {
             else {
                 await database_1.default.user.create({
                     data: {
-                        email: data.email,
+                        email: cleanEmail,
                         passwordHash,
                         firstName,
                         lastName,
@@ -420,14 +424,14 @@ class SuperAdminService {
             // Automatically create matching Vendor record if the role is Maintenance Staff
             if (mappedRole === 'Maintenance Staff') {
                 const existingVendor = await database_1.default.vendor.findFirst({
-                    where: { email: data.email },
+                    where: { email: cleanEmail },
                 });
                 if (!existingVendor) {
                     await database_1.default.vendor.create({
                         data: {
                             companyName: data.name,
                             contactName: data.name,
-                            email: data.email,
+                            email: cleanEmail,
                             phone: data.phone || '',
                             serviceType: data.serviceType || 'General Maintenance',
                             rating: 5.0,
@@ -451,13 +455,14 @@ class SuperAdminService {
         });
         return database_1.default.$transaction(async (tx) => {
             if (companyUser && companyUser.email) {
-                await tx.user.deleteMany({
-                    where: { email: companyUser.email },
+                await (0, userCleanupHelper_1.cleanupUserByEmail)(tx, companyUser.email);
+            }
+            else if (companyUser) {
+                await tx.companyUser.delete({
+                    where: { id },
                 });
             }
-            return tx.companyUser.delete({
-                where: { id },
-            });
+            return { success: true };
         });
     }
     // SaaS Subscription Plans
@@ -597,7 +602,7 @@ class SuperAdminService {
             const map = {
                 systemName: 'Apex SaaS Platform',
                 supportEmail: 'support@apexpm.com',
-                defaultCurrency: 'USD ($)',
+                defaultCurrency: 'EUR (€)',
                 appTimezone: 'UTC (Coordinated Universal Time)',
                 maintenanceMode: 'false',
             };
@@ -610,7 +615,7 @@ class SuperAdminService {
             return {
                 systemName: 'Apex SaaS Platform',
                 supportEmail: 'support@apexpm.com',
-                defaultCurrency: 'USD ($)',
+                defaultCurrency: 'EUR (€)',
                 appTimezone: 'UTC (Coordinated Universal Time)',
                 maintenanceMode: 'false',
             };

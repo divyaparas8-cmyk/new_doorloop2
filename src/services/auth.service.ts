@@ -2,15 +2,15 @@ import bcrypt from 'bcrypt';
 import prisma from '../config/database';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { AppError } from '../utils/appError';
+import { ensureRole } from '../utils/roleHelper';
 
 export class AuthService {
   async login(email: string, pass: string) {
-    let user = await prisma.user.findUnique({
-      where: { email },
+    const cleanEmail = email.trim().toLowerCase();
+    let user = await prisma.user.findFirst({
+      where: { email: cleanEmail },
       include: { role: true, company: true },
     });
-
-
 
     if (!user) {
       throw new AppError('Invalid credentials provided.', 401, 'INVALID_CREDENTIALS');
@@ -32,11 +32,45 @@ export class AuthService {
       throw new AppError('Invalid credentials provided.', 401, 'INVALID_CREDENTIALS');
     }
 
+    // Role Auto-Correction Logic: Verify user's role against entity records
+    let expectedRoleName = user.role?.name;
+
+    const ownerRecord = await prisma.owner.findFirst({ where: { email: cleanEmail } });
+    const tenantRecord = await prisma.tenant.findFirst({ where: { email: cleanEmail } });
+    const vendorRecord = await prisma.vendor.findFirst({ where: { email: cleanEmail } });
+    const companyUserRecord = await prisma.companyUser.findFirst({ where: { email: cleanEmail } });
+
+    if (tenantRecord) {
+      expectedRoleName = 'Tenant';
+    } else if (ownerRecord) {
+      expectedRoleName = 'Owner';
+    } else if (vendorRecord) {
+      expectedRoleName = 'Maintenance Staff';
+    } else if (companyUserRecord?.role) {
+      expectedRoleName = companyUserRecord.role === 'Maintenance' ? 'Maintenance Staff' : companyUserRecord.role;
+    } else if (!expectedRoleName) {
+      expectedRoleName = user.companyId ? 'Property Manager' : 'Super Admin';
+    }
+
+    // If role name is mismatched or roleId is missing, repair it
+    if (expectedRoleName && user.role?.name !== expectedRoleName) {
+      const correctRole = await ensureRole(expectedRoleName);
+      if (correctRole && correctRole.id !== user.roleId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { roleId: correctRole.id },
+          include: { role: true, company: true },
+        });
+      }
+    }
+
+    const resolvedRoleName = user.role?.name || expectedRoleName || 'Property Manager';
+
     const payload = {
       userId: user.id,
       email: user.email,
       roleId: user.roleId,
-      roleName: user.role?.name || 'Super Admin',
+      roleName: resolvedRoleName,
       companyId: user.companyId || undefined,
     };
 
@@ -50,7 +84,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         roleId: user.roleId,
-        roleName: user.role?.name || 'Super Admin',
+        roleName: resolvedRoleName,
         companyId: user.companyId,
       },
       accessToken,

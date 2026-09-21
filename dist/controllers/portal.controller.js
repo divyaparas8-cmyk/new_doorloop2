@@ -336,7 +336,7 @@ class PortalController {
             const initialMessage = JSON.stringify([
                 {
                     id: `msg-${Date.now()}`,
-                    senderName: 'Avenix Code Software Technology AI System',
+                    senderName: 'Tab Property AI System',
                     role: 'System',
                     text: `Ticket automatically categorized as '${category}' and assigned to ${assignedVendorName} (${assignedTechnician}). Contractor notified.`,
                     timestamp: new Date().toLocaleString(),
@@ -2601,7 +2601,7 @@ class PortalController {
                     firstName: 'Diya',
                     lastName: 'Jain',
                     name: 'Diya Jain',
-                    email: userEmail || 'diya.jain@avenixcode.com',
+                    email: userEmail || 'diya.jain@tabproperty.com',
                     phone: '(512) 555-0188',
                     role: req.user?.roleName || 'Collection Manager',
                     department: 'Collections & Revenue',
@@ -2618,7 +2618,7 @@ class PortalController {
                     firstName: 'Diya',
                     lastName: 'Jain',
                     name: 'Diya Jain',
-                    email: 'diya.jain@avenixcode.com',
+                    email: 'diya.jain@tabproperty.com',
                     phone: '(512) 555-0188',
                     role: 'Collection Manager',
                     department: 'Collections & Revenue',
@@ -2686,7 +2686,7 @@ class PortalController {
                     firstName: updatedFirstName || 'Diya',
                     lastName: updatedLastName || 'Jain',
                     name: `${updatedFirstName || 'Diya'} ${updatedLastName || 'Jain'}`.trim(),
-                    email: email || userEmail || 'diya.jain@avenixcode.com',
+                    email: email || userEmail || 'diya.jain@tabproperty.com',
                     phone: phone || '(512) 555-0188',
                     role: req.user?.roleName || 'Collection Manager',
                     department: department || 'Collections & Revenue',
@@ -2704,7 +2704,7 @@ class PortalController {
                     firstName: 'Diya',
                     lastName: 'Jain',
                     name: 'Diya Jain',
-                    email: 'diya.jain@avenixcode.com',
+                    email: 'diya.jain@tabproperty.com',
                     phone: '(512) 555-0188',
                     role: 'Collection Manager',
                     department: 'Collections & Revenue',
@@ -2763,7 +2763,7 @@ Active Lease Overview:
                             messages: [
                                 {
                                     role: 'system',
-                                    content: `You are the official 24/7 AI Lease Assistant for Avenix Code Software Technology Property Management. Answer the resident's question accurately, warmly, and concisely (under 80 words) based strictly on their signed lease agreement context:\n\n${leaseSummaryText}`,
+                                    content: `You are the official 24/7 AI Lease Assistant for Tab Property Management. Answer the resident's question accurately, warmly, and concisely (under 80 words) based strictly on their signed lease agreement context:\n\n${leaseSummaryText}`,
                                 },
                                 { role: 'user', content: question },
                             ],
@@ -2877,7 +2877,7 @@ Tenant Portal Context:
                             messages: [
                                 {
                                     role: 'system',
-                                    content: `You are the official 24/7 AI Tenant Concierge assistant for Avenix Code Software Technology. Help the resident warmly, clearly, and concisely (under 75 words) based on their live real-time account data:\n\n${tenantContextText}`,
+                                    content: `You are the official 24/7 AI Tenant Concierge assistant for Tab Property. Help the resident warmly, clearly, and concisely (under 75 words) based on their live real-time account data:\n\n${tenantContextText}`,
                                 },
                                 { role: 'user', content: message },
                             ],

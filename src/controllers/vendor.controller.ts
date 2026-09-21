@@ -5,6 +5,8 @@ import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import bcrypt from 'bcrypt';
 import { getManagerCompanyId } from '../utils/companyHelper';
 import { AppError } from '../utils/appError';
+import { ensureRole } from '../utils/roleHelper';
+import { cleanupUserByEmail, purgeOrphanedUserByEmail } from '../utils/userCleanupHelper';
 
 export class VendorController {
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -26,15 +28,18 @@ export class VendorController {
         },
       });
 
-      const vendorsWithStatus = vendors.map((v) => {
-        const userRec = matchedUsers.find((u) => u.email === v.email);
+      const userMap = new Map(matchedUsers.map((u) => [u.email.toLowerCase(), u]));
+
+      const vendorsWithUserStatus = vendors.map((v) => {
+        const matchingUser = v.email ? userMap.get(v.email.toLowerCase()) : null;
         return {
           ...v,
-          status: userRec ? userRec.status : 'Active',
+          userStatus: matchingUser ? matchingUser.status : 'No Login',
+          userId: matchingUser ? matchingUser.id : null,
         };
       });
 
-      return sendSuccess({ res, data: vendorsWithStatus });
+      return sendSuccess({ res, data: vendorsWithUserStatus });
     } catch (error) {
       next(error);
     }
@@ -44,8 +49,11 @@ export class VendorController {
     try {
       const { companyName, contactName, email, phone, serviceType, rating, password } = req.body;
       const companyId = await getManagerCompanyId(req, req.body.companyId || req.user?.companyId);
+
       if (email) {
-        const existingUser = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+        await purgeOrphanedUserByEmail(prisma, email);
+
+        const existingUser = await prisma.user.findFirst({ where: { email: email.trim().toLowerCase() } });
         if (existingUser) {
           throw new AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
         }
@@ -70,9 +78,7 @@ export class VendorController {
 
       // Automatically create matching login user for this vendor (Maintenance Staff role)
       if (email) {
-        const roleObj = await prisma.role.findFirst({
-          where: { name: 'Maintenance Staff' },
-        });
+        const roleObj = await ensureRole('Maintenance Staff');
 
         if (roleObj) {
           const passwordHash = await bcrypt.hash(password || 'vendor123', 12);
@@ -82,7 +88,7 @@ export class VendorController {
 
           await prisma.user.create({
             data: {
-              email,
+              email: email.trim().toLowerCase(),
               passwordHash,
               firstName,
               lastName,
@@ -139,14 +145,13 @@ export class VendorController {
       if (!vendor) throw new Error('Vendor not found.');
 
       if (vendor.email) {
-        await prisma.user.deleteMany({
-          where: { email: vendor.email },
+        await cleanupUserByEmail(prisma, vendor.email);
+      } else {
+        await prisma.vendor.delete({
+          where: { id },
         });
       }
 
-      await prisma.vendor.delete({
-        where: { id },
-      });
       return sendSuccess({ res, data: { success: true } });
     } catch (error) {
       next(error);

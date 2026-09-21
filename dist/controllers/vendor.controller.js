@@ -9,6 +9,8 @@ const apiResponse_1 = require("../utils/apiResponse");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const companyHelper_1 = require("../utils/companyHelper");
 const appError_1 = require("../utils/appError");
+const roleHelper_1 = require("../utils/roleHelper");
+const userCleanupHelper_1 = require("../utils/userCleanupHelper");
 class VendorController {
     async getAll(req, res, next) {
         try {
@@ -27,14 +29,16 @@ class VendorController {
                     companyId: companyId || undefined,
                 },
             });
-            const vendorsWithStatus = vendors.map((v) => {
-                const userRec = matchedUsers.find((u) => u.email === v.email);
+            const userMap = new Map(matchedUsers.map((u) => [u.email.toLowerCase(), u]));
+            const vendorsWithUserStatus = vendors.map((v) => {
+                const matchingUser = v.email ? userMap.get(v.email.toLowerCase()) : null;
                 return {
                     ...v,
-                    status: userRec ? userRec.status : 'Active',
+                    userStatus: matchingUser ? matchingUser.status : 'No Login',
+                    userId: matchingUser ? matchingUser.id : null,
                 };
             });
-            return (0, apiResponse_1.sendSuccess)({ res, data: vendorsWithStatus });
+            return (0, apiResponse_1.sendSuccess)({ res, data: vendorsWithUserStatus });
         }
         catch (error) {
             next(error);
@@ -45,7 +49,8 @@ class VendorController {
             const { companyName, contactName, email, phone, serviceType, rating, password } = req.body;
             const companyId = await (0, companyHelper_1.getManagerCompanyId)(req, req.body.companyId || req.user?.companyId);
             if (email) {
-                const existingUser = await database_1.default.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+                await (0, userCleanupHelper_1.purgeOrphanedUserByEmail)(database_1.default, email);
+                const existingUser = await database_1.default.user.findFirst({ where: { email: email.trim().toLowerCase() } });
                 if (existingUser) {
                     throw new appError_1.AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
                 }
@@ -67,9 +72,7 @@ class VendorController {
             });
             // Automatically create matching login user for this vendor (Maintenance Staff role)
             if (email) {
-                const roleObj = await database_1.default.role.findFirst({
-                    where: { name: 'Maintenance Staff' },
-                });
+                const roleObj = await (0, roleHelper_1.ensureRole)('Maintenance Staff');
                 if (roleObj) {
                     const passwordHash = await bcrypt_1.default.hash(password || 'vendor123', 12);
                     const nameParts = (contactName || companyName || 'Vendor').trim().split(/\s+/);
@@ -77,7 +80,7 @@ class VendorController {
                     const lastName = nameParts.slice(1).join(' ') || 'Partner';
                     await database_1.default.user.create({
                         data: {
-                            email,
+                            email: email.trim().toLowerCase(),
                             passwordHash,
                             firstName,
                             lastName,
@@ -132,13 +135,13 @@ class VendorController {
             if (!vendor)
                 throw new Error('Vendor not found.');
             if (vendor.email) {
-                await database_1.default.user.deleteMany({
-                    where: { email: vendor.email },
+                await (0, userCleanupHelper_1.cleanupUserByEmail)(database_1.default, vendor.email);
+            }
+            else {
+                await database_1.default.vendor.delete({
+                    where: { id },
                 });
             }
-            await database_1.default.vendor.delete({
-                where: { id },
-            });
             return (0, apiResponse_1.sendSuccess)({ res, data: { success: true } });
         }
         catch (error) {

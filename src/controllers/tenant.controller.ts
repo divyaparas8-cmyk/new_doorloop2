@@ -7,6 +7,8 @@ import bcrypt from 'bcrypt';
 import cloudinary from '../config/cloudinary.js';
 import { secondaryService } from '../services/secondary.service.js';
 import { getManagerCompanyId } from '../utils/companyHelper.js';
+import { ensureRole } from '../utils/roleHelper.js';
+import { cleanupUserByEmail, purgeOrphanedUserByEmail } from '../utils/userCleanupHelper.js';
 
 export class TenantController {
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -55,6 +57,10 @@ export class TenantController {
       } = req.body;
       const companyId = await getManagerCompanyId(req, req.body.companyId || req.user?.companyId);
       const file = req.file;
+
+      if (email) {
+        await purgeOrphanedUserByEmail(prisma, email);
+      }
 
       let imageUrl = null;
       if (file) {
@@ -116,24 +122,13 @@ export class TenantController {
         targetId: tenant.id,
       }).catch(console.error);
 
-      if (password) {
-        let role = await prisma.role.findFirst({
-          where: { name: 'Tenant' },
-        });
-        if (!role) {
-          const allRoles = await prisma.role.findMany();
-          role = allRoles.find((r) => r.name.toLowerCase() === 'tenant') as any;
-        }
-        if (!role) {
-          role = await prisma.role.create({
-            data: { name: 'Tenant', description: 'Tenant Role' },
-          });
-        }
+      if (password && email) {
+        const role = await ensureRole('Tenant');
         if (role) {
           const passwordHash = await bcrypt.hash(password, 12);
           await prisma.user.create({
             data: {
-              email,
+              email: email.trim().toLowerCase(),
               passwordHash,
               firstName: firstName || 'Tenant',
               lastName: lastName || 'User',
@@ -278,18 +273,7 @@ export class TenantController {
             },
           });
         } else {
-          let role = await prisma.role.findFirst({
-            where: { name: 'Tenant' },
-          });
-          if (!role) {
-            const allRoles = await prisma.role.findMany();
-            role = allRoles.find((r) => r.name.toLowerCase() === 'tenant') as any;
-          }
-          if (!role) {
-            role = await prisma.role.create({
-              data: { name: 'Tenant', description: 'Tenant Role' },
-            });
-          }
+          const role = await ensureRole('Tenant');
           if (role) {
             await prisma.user.create({
               data: {
@@ -317,16 +301,15 @@ export class TenantController {
 
   async delete(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const companyId = req.user?.companyId;
-      const id = req.params.id as string;
 
-      const tenant = await prisma.tenant.findUnique({
-        where: { id },
+      const tenant = await prisma.tenant.findFirst({
+        where: companyId ? { id, companyId } : { id },
       });
-      if (!tenant) throw new AppError('Tenant not found.', 404, 'NOT_FOUND');
 
-      if (companyId && tenant.companyId !== companyId) {
-        throw new AppError('Tenant not found.', 404, 'NOT_FOUND');
+      if (!tenant) {
+        return res.status(404).json({ success: false, error: 'Tenant not found' });
       }
 
       await prisma.$transaction(async (tx) => {
@@ -364,11 +347,9 @@ export class TenantController {
           where: { tenantId: id },
         });
 
-        // 6. Delete login user
+        // 6. Delete login user and clean up all matching user records
         if (tenant.email) {
-          await tx.user.deleteMany({
-            where: { email: tenant.email },
-          });
+          await cleanupUserByEmail(tx, tenant.email);
         }
 
         // 7. Finally, delete the Tenant itself

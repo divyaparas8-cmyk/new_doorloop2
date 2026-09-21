@@ -11,6 +11,8 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const cloudinary_js_1 = __importDefault(require("../config/cloudinary.js"));
 const secondary_service_js_1 = require("../services/secondary.service.js");
 const companyHelper_js_1 = require("../utils/companyHelper.js");
+const roleHelper_js_1 = require("../utils/roleHelper.js");
+const userCleanupHelper_js_1 = require("../utils/userCleanupHelper.js");
 class TenantController {
     async getAll(req, res, next) {
         try {
@@ -38,6 +40,9 @@ class TenantController {
             const { firstName, lastName, email, phone, unitId, status, password, dob, nationality, idType, idNumber, emergencyName, emergencyRelationship, emergencyPhone, employer, position, monthlyIncome, employmentStatus, currentAddress, } = req.body;
             const companyId = await (0, companyHelper_js_1.getManagerCompanyId)(req, req.body.companyId || req.user?.companyId);
             const file = req.file;
+            if (email) {
+                await (0, userCleanupHelper_js_1.purgeOrphanedUserByEmail)(database_js_1.default, email);
+            }
             let imageUrl = null;
             if (file) {
                 try {
@@ -93,24 +98,13 @@ class TenantController {
                 companyId,
                 targetId: tenant.id,
             }).catch(console.error);
-            if (password) {
-                let role = await database_js_1.default.role.findFirst({
-                    where: { name: 'Tenant' },
-                });
-                if (!role) {
-                    const allRoles = await database_js_1.default.role.findMany();
-                    role = allRoles.find((r) => r.name.toLowerCase() === 'tenant');
-                }
-                if (!role) {
-                    role = await database_js_1.default.role.create({
-                        data: { name: 'Tenant', description: 'Tenant Role' },
-                    });
-                }
+            if (password && email) {
+                const role = await (0, roleHelper_js_1.ensureRole)('Tenant');
                 if (role) {
                     const passwordHash = await bcrypt_1.default.hash(password, 12);
                     await database_js_1.default.user.create({
                         data: {
-                            email,
+                            email: email.trim().toLowerCase(),
                             passwordHash,
                             firstName: firstName || 'Tenant',
                             lastName: lastName || 'User',
@@ -230,18 +224,7 @@ class TenantController {
                     });
                 }
                 else {
-                    let role = await database_js_1.default.role.findFirst({
-                        where: { name: 'Tenant' },
-                    });
-                    if (!role) {
-                        const allRoles = await database_js_1.default.role.findMany();
-                        role = allRoles.find((r) => r.name.toLowerCase() === 'tenant');
-                    }
-                    if (!role) {
-                        role = await database_js_1.default.role.create({
-                            data: { name: 'Tenant', description: 'Tenant Role' },
-                        });
-                    }
+                    const role = await (0, roleHelper_js_1.ensureRole)('Tenant');
                     if (role) {
                         await database_js_1.default.user.create({
                             data: {
@@ -268,15 +251,13 @@ class TenantController {
     }
     async delete(req, res, next) {
         try {
+            const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
             const companyId = req.user?.companyId;
-            const id = req.params.id;
-            const tenant = await database_js_1.default.tenant.findUnique({
-                where: { id },
+            const tenant = await database_js_1.default.tenant.findFirst({
+                where: companyId ? { id, companyId } : { id },
             });
-            if (!tenant)
-                throw new appError_js_1.AppError('Tenant not found.', 404, 'NOT_FOUND');
-            if (companyId && tenant.companyId !== companyId) {
-                throw new appError_js_1.AppError('Tenant not found.', 404, 'NOT_FOUND');
+            if (!tenant) {
+                return res.status(404).json({ success: false, error: 'Tenant not found' });
             }
             await database_js_1.default.$transaction(async (tx) => {
                 // 1. Delete rent payments linked to tenant
@@ -308,11 +289,9 @@ class TenantController {
                 await tx.insurancePolicy.deleteMany({
                     where: { tenantId: id },
                 });
-                // 6. Delete login user
+                // 6. Delete login user and clean up all matching user records
                 if (tenant.email) {
-                    await tx.user.deleteMany({
-                        where: { email: tenant.email },
-                    });
+                    await (0, userCleanupHelper_js_1.cleanupUserByEmail)(tx, tenant.email);
                 }
                 // 7. Finally, delete the Tenant itself
                 await tx.tenant.delete({

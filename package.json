@@ -1,7 +1,7 @@
 {
-  "name": "avenixcode-backend",
+  "name": "tabproperty-backend",
   "version": "1.0.0",
-  "description": "Avenix Code Property Management ERP Backend Service",
+  "description": "Tab Property Management ERP Backend Service",
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {

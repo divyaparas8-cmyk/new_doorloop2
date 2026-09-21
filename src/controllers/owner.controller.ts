@@ -6,6 +6,8 @@ import bcrypt from 'bcrypt';
 import { secondaryService } from '../services/secondary.service.js';
 import { getManagerCompanyId } from '../utils/companyHelper.js';
 import { AppError } from '../utils/appError.js';
+import { ensureRole } from '../utils/roleHelper.js';
+import { cleanupUserByEmail, purgeOrphanedUserByEmail } from '../utils/userCleanupHelper.js';
 
 export class OwnerController {
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -30,12 +32,14 @@ export class OwnerController {
       const companyId = await getManagerCompanyId(req, req.body.companyId || req.user?.companyId);
 
       if (email) {
-        const existingUser = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+        await purgeOrphanedUserByEmail(prisma, email);
+
+        const existingUser = await prisma.user.findFirst({ where: { email: email.trim().toLowerCase() } });
         if (existingUser) {
           throw new AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
         }
 
-        const existingOwner = await prisma.owner.findUnique({ where: { email: email.trim().toLowerCase() } });
+        const existingOwner = await prisma.owner.findFirst({ where: { email: email.trim().toLowerCase() } });
         if (existingOwner) {
           throw new AppError('Email address is already registered.', 400, 'DUPLICATE_EMAIL');
         }
@@ -66,26 +70,15 @@ export class OwnerController {
         });
       }
 
-      if (password) {
-        let role = await prisma.role.findFirst({
-          where: { name: 'Owner' },
-        });
-        if (!role) {
-          const allRoles = await prisma.role.findMany();
-          role = allRoles.find((r) => r.name.toLowerCase() === 'owner') as any;
-        }
-        if (!role) {
-          role = await prisma.role.create({
-            data: { name: 'Owner', description: 'Owner Role' },
-          });
-        }
+      if (password && email) {
+        const role = await ensureRole('Owner');
         if (role) {
           const passwordHash = await bcrypt.hash(password, 12);
           const [first = '', ...lastParts] = resolvedName.split(' ');
           const last = lastParts.join(' ') || 'Owner';
           await prisma.user.create({
             data: {
-              email,
+              email: email.trim().toLowerCase(),
               passwordHash,
               firstName: first || 'Owner',
               lastName: last,
@@ -157,18 +150,7 @@ export class OwnerController {
             },
           });
         } else {
-          let role = await prisma.role.findFirst({
-            where: { name: 'Owner' },
-          });
-          if (!role) {
-            const allRoles = await prisma.role.findMany();
-            role = allRoles.find((r) => r.name.toLowerCase() === 'owner') as any;
-          }
-          if (!role) {
-            role = await prisma.role.create({
-              data: { name: 'Owner', description: 'Owner Role' },
-            });
-          }
+          const role = await ensureRole('Owner');
           if (role) {
             await prisma.user.create({
               data: {
@@ -284,11 +266,9 @@ export class OwnerController {
             });
           }
 
-          // 3.5 Delete associated user record
+          // 3.5 Delete associated user record and cleanup across all user tables
           if (ownerExists.email) {
-            await tx.user.deleteMany({
-              where: { email: ownerExists.email },
-            });
+            await cleanupUserByEmail(tx, ownerExists.email);
           }
 
           // 4. Finally delete the owner record
