@@ -651,8 +651,11 @@ export class SuperAdminService {
     const totalInvoices = await prisma.saaSInvoice.count();
 
     const invoiceSum = await prisma.saaSInvoice.aggregate({
+      where: { status: 'Paid' },
       _sum: { amount: true },
     });
+
+    const totalRevenue = invoiceSum._sum.amount || 0;
 
     return {
       totalCompanies,
@@ -660,10 +663,10 @@ export class SuperAdminService {
       totalUsers,
       totalPlans,
       totalInvoices,
-      totalArr: invoiceSum._sum.amount || 149700,
-      monthlyGrowth: '12.4%',
+      totalArr: totalRevenue,
+      monthlyGrowth: '0%',
       activeSubscriptions: activeCompanies,
-      storageUsed: '48.5 GB',
+      storageUsed: totalCompanies > 0 ? `${(totalCompanies * 0.5).toFixed(1)} GB` : '0 GB',
     };
   }
 
@@ -711,23 +714,9 @@ export class SuperAdminService {
   // Audit Logs
   async getAuditLogs() {
     try {
-      const logs = await prisma.auditLog.findMany({
+      return await prisma.auditLog.findMany({
         orderBy: { timestamp: 'desc' },
       });
-      if (logs.length === 0) {
-        await prisma.auditLog.createMany({
-          data: [
-            { action: 'Company Status Suspended', module: 'SuperAdmin', object: 'Company', ip: '198.162.0.12', status: 'Success' },
-            { action: 'Changed Platform SMTP Configuration', module: 'Settings', object: 'SMTP', ip: '198.162.0.12', status: 'Success' },
-            { action: 'Generated New API Integration Key', module: 'Integrations', object: 'API Keys', ip: '198.162.0.8', status: 'Success' },
-            { action: 'Created New SaaS Subscription Plan', module: 'Billing', object: 'SaaS Plan', ip: '198.162.0.12', status: 'Success' },
-          ],
-        });
-        return prisma.auditLog.findMany({
-          orderBy: { timestamp: 'desc' },
-        });
-      }
-      return logs;
     } catch (e) {
       console.error('Audit logs error:', e);
       return [];

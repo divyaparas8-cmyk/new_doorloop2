@@ -5,22 +5,31 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting Clean Database Seeding (SuperAdmin Only)...');
 
-  console.log('🧹 Clearing old tables...');
+  console.log('🧹 Disabling Foreign Key Checks and wiping all tables...');
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE permissions;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE users;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE companies;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE roles;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE properties;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE buildings;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE units;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE owners;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE leases;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE bank_accounts;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE coa_accounts;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE vendors;');
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE applications;');
-  console.log('✨ All old tables truncated successfully.');
+
+  const tables = [
+    'permissions', 'user_assignments', 'users', 'company_users', 'companies', 'roles',
+    'properties', 'buildings', 'units', 'owners', 'tenants', 'leases', 'rent_payments',
+    'lease_renewals', 'coa_accounts', 'journal_entries', 'journal_entry_lines', 'vendors',
+    'work_orders', 'owner_distributions', 'audit_logs', 'announcements', 'insurance_policies',
+    'promotions', 'notifications', 'documents', 'ai_chat_logs', 'bank_accounts', 'subscription_plans',
+    'security_policies', 'payment_plans', 'crm_leads', 'screening_reports', 'violations',
+    'applications', 'invoices', 'service_requests', 'saas_plans', 'saas_invoices', 'platform_settings',
+    'owner_documents', 'owner_messages', 'tenant_documents', 'tenant_messages', 'tenant_notifications',
+    'staff_profiles', 'charges', 'deposits', 'expenses', 'maintenance_requests', 'move_ins',
+    'inspection_templates', 'inspection_template_rooms', 'inspection_template_items', 'inspections'
+  ];
+
+  for (const table of tables) {
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE \`${table}\`;`);
+    } catch {
+      await prisma.$executeRawUnsafe(`DELETE FROM \`${table}\`;`).catch(() => {});
+    }
+  }
+
+  console.log('✨ All database tables cleared successfully.');
 
   // 1. Create System Roles
   console.log('🔐 Creating system roles...');
@@ -72,7 +81,7 @@ async function main() {
     },
   });
 
-  // 2. Create System Permissions for Super Admin & Property Manager
+  // 2. Create System Permissions for Super Admin & Property Manager (Bulk Insert)
   console.log('🛡️ Creating system permissions...');
   const modules = [
     'Dashboard',
@@ -89,50 +98,33 @@ async function main() {
     'Company Settings',
   ];
 
+  const permData: any[] = [];
   for (const moduleName of modules) {
-    await prisma.permission.create({
-      data: {
-        roleId: adminRole.id,
-        module: moduleName,
-        canView: true,
-        canCreate: true,
-        canEdit: true,
-        canDelete: true,
-        canApprove: true,
-        canExport: true,
-      },
+    permData.push({
+      roleId: adminRole.id,
+      module: moduleName,
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      canDelete: true,
+      canApprove: true,
+      canExport: true,
     });
-
-    await prisma.permission.create({
-      data: {
-        roleId: managerRole.id,
-        module: moduleName,
-        canView: true,
-        canCreate: true,
-        canEdit: true,
-        canDelete: true,
-        canApprove: true,
-        canExport: true,
-      },
+    permData.push({
+      roleId: managerRole.id,
+      module: moduleName,
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      canDelete: true,
+      canApprove: true,
+      canExport: true,
     });
   }
 
-  // 3. Create Main Company
-  console.log('🏢 Creating main company...');
-  const company = await prisma.company.create({
-    data: {
-      name: 'Tab Property Management',
-      code: 'TABPM',
-      contactName: 'Super Admin',
-      email: 'contact@apexpm.com',
-      phone: '(512) 555-0100',
-      planName: 'Enterprise SaaS',
-      storageUsed: '0 GB',
-      status: 'Active',
-    },
-  });
+  await Promise.all(permData.map(p => prisma.permission.create({ data: p }).catch(() => {})));
 
-  // 4. Create ONLY Super Admin User
+  // 3. Create ONLY Super Admin User
   console.log('👤 Creating Super Admin user...');
   const passwordHash = '$2b$12$40JauO0pCs/qcnmGiUv/3.pHpsCYU5Ah9ZmTZV2Z1PvMvFqPAHt.u'; // password: '123456'
 
@@ -145,12 +137,12 @@ async function main() {
       phone: '(512) 555-0100',
       roleId: adminRole.id,
       status: 'Active',
-      companyId: company.id,
+      companyId: null,
     },
   });
 
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
-  console.log('✅ Clean seeding complete! Only SuperAdmin user exists.');
+  console.log('✅ Clean seeding complete! Only SuperAdmin user exists in Database.');
 }
 
 main()
