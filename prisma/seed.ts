@@ -3,80 +3,77 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting Tab Property ERP Database Seeding...');
+  console.log('🌱 Starting Clean Database Seeding (SuperAdmin Only)...');
 
-  // Disable FK checks for seamless seeding across remote proxy
+  console.log('🧹 Clearing old tables...');
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
-  await prisma.$executeRawUnsafe('DELETE FROM permissions;');
-  await prisma.$executeRawUnsafe('DELETE FROM users;');
-  await prisma.$executeRawUnsafe('DELETE FROM companies;');
-  await prisma.$executeRawUnsafe('DELETE FROM roles;');
-  await prisma.$executeRawUnsafe('DELETE FROM properties;');
-  await prisma.$executeRawUnsafe('DELETE FROM units;');
-  await prisma.$executeRawUnsafe('DELETE FROM leases;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE permissions;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE users;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE companies;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE roles;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE properties;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE buildings;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE units;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE owners;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE leases;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE bank_accounts;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE coa_accounts;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE vendors;');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE applications;');
+  console.log('✨ All old tables truncated successfully.');
 
-  // 1. Create Roles
-  const adminRole = await prisma.role.upsert({
-    where: { name: 'Super Admin' },
-    update: {},
-    create: {
+  // 1. Create System Roles
+  console.log('🔐 Creating system roles...');
+  const adminRole = await prisma.role.create({
+    data: {
       name: 'Super Admin',
       description: 'Master account with full administrative permissions.',
       isCustom: false,
     },
   });
 
-  const ownerRole = await prisma.role.upsert({
-    where: { name: 'Owner' },
-    update: {},
-    create: {
+  const ownerRole = await prisma.role.create({
+    data: {
       name: 'Owner',
       description: 'Owner access to financial statements and payouts.',
       isCustom: false,
     },
   });
 
-  const tenantRole = await prisma.role.upsert({
-    where: { name: 'Tenant' },
-    update: {},
-    create: {
+  const tenantRole = await prisma.role.create({
+    data: {
       name: 'Tenant',
       description: 'Tenant portal access for rent payments and maintenance.',
       isCustom: false,
     },
   });
 
-  const staffRole = await prisma.role.upsert({
-    where: { name: 'Maintenance Staff' },
-    update: {},
-    create: {
+  const staffRole = await prisma.role.create({
+    data: {
       name: 'Maintenance Staff',
       description: 'Maintenance dispatcher and tech access.',
       isCustom: false,
     },
   });
 
-  const collectionRole = await prisma.role.upsert({
-    where: { name: 'Collection Manager' },
-    update: {},
-    create: {
+  const collectionRole = await prisma.role.create({
+    data: {
       name: 'Collection Manager',
       description: 'Collection manager access.',
       isCustom: false,
     },
   });
 
-  const managerRole = await prisma.role.upsert({
-    where: { name: 'Property Manager' },
-    update: {},
-    create: {
+  const managerRole = await prisma.role.create({
+    data: {
       name: 'Property Manager',
       description: 'Property manager access with operational permissions.',
       isCustom: false,
     },
   });
 
-  // 2. Create Permissions for Admin and Manager Roles
+  // 2. Create System Permissions for Super Admin & Property Manager
+  console.log('🛡️ Creating system permissions...');
   const modules = [
     'Dashboard',
     'Properties',
@@ -93,15 +90,8 @@ async function main() {
   ];
 
   for (const moduleName of modules) {
-    await prisma.permission.upsert({
-      where: {
-        roleId_module: {
-          roleId: adminRole.id,
-          module: moduleName,
-        },
-      },
-      update: {},
-      create: {
+    await prisma.permission.create({
+      data: {
         roleId: adminRole.id,
         module: moduleName,
         canView: true,
@@ -113,15 +103,8 @@ async function main() {
       },
     });
 
-    await prisma.permission.upsert({
-      where: {
-        roleId_module: {
-          roleId: managerRole.id,
-          module: moduleName,
-        },
-      },
-      update: {},
-      create: {
+    await prisma.permission.create({
+      data: {
         roleId: managerRole.id,
         module: moduleName,
         canView: true,
@@ -134,379 +117,40 @@ async function main() {
     });
   }
 
-  // 3. Create Companies Early to Link Data
-  const apex = await prisma.company.upsert({
-    where: { email: 'contact@apexpm.com' },
-    update: {},
-    create: {
-      name: 'Apex Property Management',
-      code: 'APEX',
-      contactName: 'Sarah Davis',
+  // 3. Create Main Company
+  console.log('🏢 Creating main company...');
+  const company = await prisma.company.create({
+    data: {
+      name: 'Tab Property Management',
+      code: 'TABPM',
+      contactName: 'Super Admin',
       email: 'contact@apexpm.com',
       phone: '(512) 555-0100',
       planName: 'Enterprise SaaS',
-      storageUsed: '4.8 GB',
+      storageUsed: '0 GB',
       status: 'Active',
     },
   });
 
-  const skyline = await prisma.company.upsert({
-    where: { email: 'info@skylineig.com' },
-    update: {},
-    create: {
-      name: 'Skyline Investment Group',
-      code: 'SKYL',
-      contactName: 'Robert Vance',
-      email: 'info@skylineig.com',
-      phone: '(415) 555-0199',
-      planName: 'Pro Plan',
-      storageUsed: '2.1 GB',
-      status: 'Active',
-    },
-  });
+  // 4. Create ONLY Super Admin User
+  console.log('👤 Creating Super Admin user...');
+  const passwordHash = '$2b$12$40JauO0pCs/qcnmGiUv/3.pHpsCYU5Ah9ZmTZV2Z1PvMvFqPAHt.u'; // password: '123456'
 
-  // 4. Create Users matching frontend login credentials and scoped by Company
-  const passwordHash = '$2b$12$.7Eltwn3P5WSIRFXyufxBO6rd3iBHTCldIRISybV7tO5h/o7Zq0Ee'; // password: 'admin123'
-  
-  // Apex Users
-  const passwordHash123456 = '$2b$12$40JauO0pCs/qcnmGiUv/3.pHpsCYU5Ah9ZmTZV2Z1PvMvFqPAHt.u'; // password: '123456'
-  await prisma.user.upsert({
-    where: { email: 'admin@apexpm.com' },
-    update: { roleId: adminRole.id, companyId: apex.id, passwordHash: passwordHash123456 },
-    create: {
+  await prisma.user.create({
+    data: {
       email: 'admin@apexpm.com',
-      passwordHash: passwordHash123456,
-      firstName: 'John',
-      lastName: 'Doe',
+      passwordHash,
+      firstName: 'Super',
+      lastName: 'Admin',
       phone: '(512) 555-0100',
       roleId: adminRole.id,
       status: 'Active',
-      companyId: apex.id,
+      companyId: company.id,
     },
-  });
-
-  await prisma.user.upsert({
-    where: { email: 'manager@apexpm.com' },
-    update: { roleId: managerRole.id, companyId: apex.id },
-    create: {
-      email: 'manager@apexpm.com',
-      passwordHash,
-      firstName: 'Sarah',
-      lastName: 'Davis',
-      phone: '(512) 555-0101',
-      roleId: managerRole.id,
-      status: 'Active',
-      companyId: apex.id,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { email: 'owner@apexpm.com' },
-    update: { roleId: ownerRole.id, companyId: apex.id },
-    create: {
-      email: 'owner@apexpm.com',
-      passwordHash,
-      firstName: 'Lakeside',
-      lastName: 'Development',
-      phone: '(512) 555-0102',
-      roleId: ownerRole.id,
-      status: 'Active',
-      companyId: apex.id,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { email: 'tenant@apexpm.com' },
-    update: { roleId: tenantRole.id, companyId: apex.id },
-    create: {
-      email: 'tenant@apexpm.com',
-      passwordHash,
-      firstName: 'Robert',
-      lastName: 'Johnson',
-      phone: '(512) 555-0103',
-      roleId: tenantRole.id,
-      status: 'Active',
-      companyId: apex.id,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { email: 'staff@apexpm.com' },
-    update: { roleId: staffRole.id, companyId: apex.id },
-    create: {
-      email: 'staff@apexpm.com',
-      passwordHash,
-      firstName: 'Technician',
-      lastName: 'Lead 1',
-      phone: '(512) 555-0104',
-      roleId: staffRole.id,
-      status: 'Active',
-      companyId: apex.id,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { email: 'collection@apexpm.com' },
-    update: { roleId: collectionRole.id, companyId: apex.id },
-    create: {
-      email: 'collection@apexpm.com',
-      passwordHash,
-      firstName: 'Michael',
-      lastName: 'Collection',
-      phone: '(512) 555-0105',
-      roleId: collectionRole.id,
-      status: 'Active',
-      companyId: apex.id,
-    },
-  });
-
-  // Skyline User (Isolate test)
-  await prisma.user.upsert({
-    where: { email: 'manager@skylineig.com' },
-    update: { roleId: managerRole.id, companyId: skyline.id },
-    create: {
-      email: 'manager@skylineig.com',
-      passwordHash,
-      firstName: 'Robert',
-      lastName: 'Vance',
-      phone: '(415) 555-0199',
-      roleId: managerRole.id,
-      status: 'Active',
-      companyId: skyline.id,
-    },
-  });
-
-  // 5. Create Owners
-  const ownerApex = await prisma.owner.create({
-    data: {
-      name: 'William Anderson',
-      email: 'bill.a@investments.com',
-      phone: '(212) 555-0122',
-      payoutMethod: 'ACH/Direct Deposit',
-      companyId: apex.id,
-    },
-  });
-
-  const ownerSkyline = await prisma.owner.create({
-    data: {
-      name: 'Bob Vance',
-      email: 'bob@skylineig.com',
-      phone: '(415) 555-0233',
-      payoutMethod: 'ACH/Direct Deposit',
-      companyId: skyline.id,
-    },
-  });
-
-  // 6. Create Properties & Units
-  // Apex Properties
-  const propNamesApex = ['Oakridge Heights', 'Downtown Plaza', 'Sunset Villas'];
-  for (let i = 0; i < propNamesApex.length; i++) {
-    const property = await prisma.property.create({
-      data: {
-        name: propNamesApex[i],
-        type: 'Apartment',
-        status: 'Active',
-        ownerId: ownerApex.id,
-        ownershipPercentage: 100,
-        managementCompany: 'Apex Property Management',
-        address: `${100 + i * 12} Main St, Austin, TX 7870${i}`,
-        streetAddress: `${100 + i * 12} Main St`,
-        city: 'Austin',
-        state: 'TX',
-        zip: `7870${i}`,
-        unitsCount: 5,
-        occupiedUnits: 4,
-        occupancyRate: 80,
-        companyId: apex.id,
-        yearBuilt: 2018,
-        purchasePrice: 1500000,
-        currentValue: 1800000,
-        squareFootage: 12000,
-      },
-    });
-
-    const building = await prisma.building.create({
-      data: {
-        propertyId: property.id,
-        name: 'Building A',
-        floors: 2,
-        unitsCount: 5,
-        occupancyRate: 80,
-      },
-    });
-
-    for (let u = 1; u <= 3; u++) {
-      await prisma.unit.create({
-        data: {
-          propertyId: property.id,
-          buildingId: building.id,
-          unitNumber: `10${u}`,
-          floor: 1,
-          bedrooms: 2,
-          bathrooms: 1.5,
-          squareFootage: 850,
-          rentAmount: 1500,
-          securityDeposit: 1500,
-          availabilityDate: new Date('2026-08-01'),
-          status: 'Occupied',
-        },
-      });
-    }
-  }
-
-  // Skyline Properties
-  const skylineProp = await prisma.property.create({
-    data: {
-      name: 'Skyline Heights',
-      type: 'Commercial',
-      status: 'Active',
-      ownerId: ownerSkyline.id,
-      ownershipPercentage: 100,
-      managementCompany: 'Skyline Investment Group',
-      address: '900 Skyline Dr, San Francisco, CA 94101',
-      streetAddress: '900 Skyline Dr',
-      city: 'San Francisco',
-      state: 'CA',
-      zip: '94101',
-      unitsCount: 1,
-      occupiedUnits: 1,
-      occupancyRate: 100,
-      companyId: skyline.id,
-      yearBuilt: 2015,
-      purchasePrice: 4000000,
-      currentValue: 4500000,
-      squareFootage: 20000,
-    },
-  });
-
-  const skylineBuilding = await prisma.building.create({
-    data: {
-      propertyId: skylineProp.id,
-      name: 'Tower A',
-      floors: 1,
-      unitsCount: 1,
-      occupancyRate: 100,
-    },
-  });
-
-  await prisma.unit.create({
-    data: {
-      propertyId: skylineProp.id,
-      buildingId: skylineBuilding.id,
-      unitNumber: 'Suite 100',
-      floor: 1,
-      bedrooms: 0,
-      bathrooms: 2,
-      squareFootage: 2000,
-      rentAmount: 5000,
-      securityDeposit: 5000,
-      availabilityDate: new Date('2026-08-01'),
-      status: 'Occupied',
-    },
-  });
-
-  // 7. Seed Chart of Accounts
-  const coaData = [
-    { accountCode: '1010', accountName: 'Operating Checking Account', type: 'Asset', balance: 150000 },
-    { accountCode: '1020', accountName: 'Security Deposit Escrow Account', type: 'Asset', balance: 45000 },
-    { accountCode: '2010', accountName: 'Accounts Payable (AP)', type: 'Liability', balance: 12000 },
-    { accountCode: '2020', accountName: 'Tenant Security Deposit Liability', type: 'Liability', balance: 45000 },
-    { accountCode: '3010', accountName: "Owner's Equity Capital", type: 'Equity', balance: 500000 },
-    { accountCode: '4010', accountName: 'Rental Revenue Income', type: 'Revenue', balance: 220000 },
-    { accountCode: '5010', accountName: 'Maintenance & Repair Expense', type: 'Expense', balance: 25000 },
-  ];
-
-  for (const acc of coaData) {
-    // Seed for Apex
-    await prisma.coAAccount.create({
-      data: {
-        ...acc,
-        companyId: apex.id,
-      },
-    });
-
-    // Seed for Skyline (with modified code to be unique)
-    await prisma.coAAccount.create({
-      data: {
-        ...acc,
-        accountCode: `${acc.accountCode}-SKYL`,
-        companyId: skyline.id,
-      },
-    });
-  }
-
-  // 8. Seed Bank Accounts
-  await prisma.bankAccount.createMany({
-    data: [
-      { name: 'Apex Operating Account', institution: 'Chase Bank', accountNumber: '...4829', balance: 142500, type: 'Checking', status: 'Active', companyId: apex.id },
-      { name: 'Apex Escrow Account', institution: 'Wells Fargo', accountNumber: '...9012', balance: 45000, type: 'Escrow/Savings', status: 'Active', companyId: apex.id },
-      { name: 'Skyline Operating Account', institution: 'Bank of America', accountNumber: '...1134', balance: 250000, type: 'Checking', status: 'Active', companyId: skyline.id },
-    ],
-  });
-
-  // 9. Seed Vendors
-  await prisma.vendor.createMany({
-    data: [
-      { companyName: 'Apex Plumbing Experts', contactName: 'Mario', email: 'mario@apexplumbing.com', phone: '(512) 555-0988', serviceType: 'Plumbing', rating: 4.8, companyId: apex.id },
-      { companyName: 'Skyline Electricians', contactName: 'Sparky', email: 'sparky@skylineelectric.com', phone: '(415) 555-0744', serviceType: 'Electrical', rating: 4.9, companyId: skyline.id },
-    ],
-  });
-
-  // 10. Seed Applications
-  await prisma.application.createMany({
-    data: [
-      { tenantName: 'Alice Cooper', email: 'alice@example.com', propertyName: 'Oakridge Heights', unitNumber: '101', rentProposed: 1500, status: 'Pending', companyId: apex.id },
-      { tenantName: 'Bob Vance', email: 'bob@vance.com', propertyName: 'Skyline Heights', unitNumber: 'Suite 100', rentProposed: 5000, status: 'Approved', companyId: skyline.id },
-    ],
-  });
-
-  // 11. Seed Inspection Template
-  const standardTemplate = await prisma.inspectionTemplate.create({
-    data: {
-      name: 'Standard Apartment Move In Checklist',
-      type: 'MOVE_IN',
-      description: 'Comprehensive structural quality checklist for new resident move-ins.',
-      active: true,
-      createdBy: 'System',
-      companyId: apex.id,
-    },
-  });
-
-  const kitchenRoom = await prisma.inspectionTemplateRoom.create({
-    data: {
-      templateId: standardTemplate.id,
-      name: 'Kitchen',
-      sortOrder: 0,
-    },
-  });
-
-  await prisma.inspectionTemplateItem.createMany({
-    data: [
-      { roomId: kitchenRoom.id, label: 'Walls & Trim', required: true, sortOrder: 0 },
-      { roomId: kitchenRoom.id, label: 'Cabinets & Drawers', required: true, sortOrder: 1 },
-      { roomId: kitchenRoom.id, label: 'Sink & Faucet', required: true, sortOrder: 2 },
-      { roomId: kitchenRoom.id, label: 'Stove & Oven', required: true, sortOrder: 3 },
-    ],
-  });
-
-  const livingRoom = await prisma.inspectionTemplateRoom.create({
-    data: {
-      templateId: standardTemplate.id,
-      name: 'Living Room',
-      sortOrder: 1,
-    },
-  });
-
-  await prisma.inspectionTemplateItem.createMany({
-    data: [
-      { roomId: livingRoom.id, label: 'Flooring / Carpet', required: true, sortOrder: 0 },
-      { roomId: livingRoom.id, label: 'Outlets & Switches', required: true, sortOrder: 1 },
-      { roomId: livingRoom.id, label: 'Smoke Detector', required: true, sortOrder: 2 },
-    ],
   });
 
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
-  console.log('🌱 Scoped seeding completed successfully!');
+  console.log('✅ Clean seeding complete! Only SuperAdmin user exists.');
 }
 
 main()
