@@ -26,24 +26,58 @@ export class IntegrationController {
         throw new AppError('Unauthorized: Company ID not found.', 401, 'UNAUTHORIZED');
       }
 
-      const { provider, accountSid, senderId, authToken, status } = req.body;
-      if (!provider || !['TWILIO', 'WHATSAPP', 'STRIPE', 'AUTHORIZE_NET', 'RAZORPAY'].includes(provider)) {
+      const { provider, accountSid, senderId, authToken, status: requestedStatus } = req.body;
+      if (!provider || !['TWILIO', 'WHATSAPP', 'SENDGRID', 'STRIPE', 'AUTHORIZE_NET', 'RAZORPAY'].includes(provider)) {
         throw new AppError('Bad Request: Invalid integration provider.', 400, 'BAD_REQUEST');
       }
 
+      // If user is explicitly deactivating (Disconnect)
+      if (requestedStatus === 'Inactive') {
+        const updated = await integrationService.updateCompanyIntegration(companyId, provider, {
+          accountSid: accountSid || '',
+          senderId: senderId || '',
+          authToken,
+          status: 'Inactive',
+        });
+        return sendSuccess({
+          res,
+          message: `${provider} integration deactivated successfully.`,
+          data: {
+            provider: updated.provider,
+            status: 'Inactive',
+            accountSid: updated.accountSid,
+            senderId: updated.senderId,
+          }
+        });
+      }
+
+      // Dynamic automatic credential verification: Test credentials against real provider API
+      const isPayment = ['STRIPE', 'AUTHORIZE_NET', 'RAZORPAY'].includes(provider);
+      const testResult = await integrationService.testCredentials(provider, {
+        accountSid: accountSid || (provider === 'SENDGRID' ? 'SendGrid' : ''),
+        senderId: isPayment ? 'N/A' : (senderId || ''),
+        authToken: authToken || '',
+        companyId,
+      });
+
+      if (!testResult.success) {
+        throw new AppError(testResult.message || `Verification failed for ${provider}. Please check your credentials.`, 400, 'VERIFICATION_FAILED');
+      }
+
+      // Credentials verified successfully -> AUTOMATICALLY set status to ACTIVE
       const updated = await integrationService.updateCompanyIntegration(companyId, provider, {
-        accountSid,
-        senderId,
+        accountSid: accountSid || (provider === 'SENDGRID' ? 'SendGrid' : ''),
+        senderId: isPayment ? 'N/A' : (senderId || ''),
         authToken,
-        status,
+        status: 'Active',
       });
 
       return sendSuccess({
         res,
-        message: `${provider} integration saved successfully.`,
+        message: `${provider} credentials verified successfully! Connection is now ACTIVE.`,
         data: {
           provider: updated.provider,
-          status: updated.status,
+          status: 'Active',
           accountSid: updated.accountSid,
           senderId: updated.senderId,
         }
@@ -61,7 +95,7 @@ export class IntegrationController {
       }
 
       const { provider, accountSid, senderId, authToken } = req.body;
-      if (!provider || !['TWILIO', 'WHATSAPP', 'STRIPE', 'AUTHORIZE_NET', 'RAZORPAY'].includes(provider)) {
+      if (!provider || !['TWILIO', 'WHATSAPP', 'SENDGRID', 'STRIPE', 'AUTHORIZE_NET', 'RAZORPAY'].includes(provider)) {
         throw new AppError('Bad Request: Invalid integration provider.', 400, 'BAD_REQUEST');
       }
 

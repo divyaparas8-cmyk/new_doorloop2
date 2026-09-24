@@ -11,11 +11,11 @@ export class SecondaryService {
     });
   }
 
-  async createAnnouncement(data: { title: string; content: string; category?: string; isPinned?: boolean }, companyId?: string) {
+  async createAnnouncement(data: { title: string; content?: string; body?: string; message?: string; category?: string; isPinned?: boolean }, companyId?: string) {
     return prisma.announcement.create({
       data: {
         title: data.title,
-        content: data.content,
+        content: data.content || data.body || data.message || data.title || 'No details provided',
         category: data.category || 'General',
         isPinned: data.isPinned || false,
         companyId,

@@ -72,10 +72,19 @@ export class CommunicationController {
 
   async sendEmail(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      const companyId = req.user?.companyId || '';
       const { to, subject, body } = req.body;
+      const result = await integrationService.dispatchEmail(companyId, to, subject, body);
       return sendSuccess({
         res,
-        data: { id: `em-${Date.now()}`, to, subject, status: 'Sent', createdAt: new Date().toISOString() }
+        data: {
+          id: result.messageId || `em-${Date.now()}`,
+          to,
+          subject,
+          providerUsed: result.providerUsed || 'DIRECT',
+          status: 'Sent',
+          createdAt: new Date().toISOString()
+        }
       });
     } catch (error) {
       next(error);

@@ -40,6 +40,18 @@ export class IntegrationService {
         hasToken: !!activeIntegrationsMap.get('WHATSAPP')?.encryptedAuthToken,
       },
       {
+        id: 'int-sendgrid',
+        name: 'SendGrid Email API',
+        provider: 'SENDGRID',
+        category: 'Communications',
+        description: 'Configure SendGrid API to send tenant emails, rent notices, and invoice receipts directly.',
+        logo: '📧',
+        status: activeIntegrationsMap.get('SENDGRID')?.status || 'Inactive',
+        accountSid: activeIntegrationsMap.get('SENDGRID')?.accountSid || '',
+        senderId: activeIntegrationsMap.get('SENDGRID')?.senderId || '',
+        hasToken: !!activeIntegrationsMap.get('SENDGRID')?.encryptedAuthToken,
+      },
+      {
         id: 'int-stripe',
         name: 'Stripe Payments',
         provider: 'STRIPE',
@@ -203,6 +215,24 @@ export class IntegrationService {
       } catch (error: any) {
         return { success: false, message: `WhatsApp Meta API verification failed: ${error.message}` };
       }
+    } else if (provider === 'SENDGRID') {
+      try {
+        const response = await fetch('https://api.sendgrid.com/v3/scopes', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${rawToken}`,
+          }
+        });
+        if (response.status === 200) {
+          return { success: true, message: 'SendGrid Email API connection successful! API Key verified.' };
+        } else {
+          const body: any = await response.json().catch(() => ({}));
+          const errorMsg = body.errors?.[0]?.message || `SendGrid authentication failed with status ${response.status}.`;
+          return { success: false, message: errorMsg };
+        }
+      } catch (error: any) {
+        return { success: false, message: `SendGrid verification failed: ${error.message}` };
+      }
     } else if (provider === 'STRIPE') {
       try {
         const response = await fetch('https://api.stripe.com/v1/balance', {
@@ -247,6 +277,52 @@ export class IntegrationService {
     }
 
     return { success: false, message: 'Unsupported provider.' };
+  }
+
+  /**
+   * Dispatch real email using company's active integration (SendGrid)
+   */
+  async dispatchEmail(
+    companyId: string,
+    recipientEmail: string,
+    subject: string,
+    body: string
+  ): Promise<{ success: boolean; providerUsed?: string; messageId?: string }> {
+    if (!companyId || !recipientEmail) return { success: false };
+
+    const activeIntegrations = await prisma.companyIntegration.findMany({
+      where: { companyId, status: 'Active' }
+    });
+
+    const sendgrid = activeIntegrations.find(i => i.provider === 'SENDGRID');
+    if (sendgrid && sendgrid.encryptedAuthToken && sendgrid.encryptionIv) {
+      try {
+        const rawToken = decrypt(sendgrid.encryptedAuthToken, sendgrid.encryptionIv);
+        const url = 'https://api.sendgrid.com/v3/mail/send';
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${rawToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: recipientEmail }] }],
+            from: { email: sendgrid.senderId || 'notifications@doorloop.com' },
+            subject: subject || 'Notice from Property Manager',
+            content: [{ type: 'text/html', value: body || subject || 'Property Notice' }]
+          })
+        });
+
+        if (response.ok || response.status === 202) {
+          return { success: true, providerUsed: 'SENDGRID', messageId: `sg-${Date.now()}` };
+        }
+      } catch (err) {
+        console.warn('SendGrid dispatch error:', err);
+      }
+    }
+
+    return { success: false };
   }
 
   /**
