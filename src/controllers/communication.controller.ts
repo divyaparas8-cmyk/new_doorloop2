@@ -157,7 +157,51 @@ export class CommunicationController {
 
   async getConversations(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      return sendSuccess({ res, data: [] });
+      return sendSuccess({
+        res,
+        data: [
+          {
+            id: 'conv-1',
+            contactName: 'John Doe',
+            channel: 'SMS',
+            lastMessage: 'Hi, when will the sink maintenance team arrive today?',
+            assignedUser: 'Property Manager Staff',
+            status: 'Active',
+            lastActivity: '10 mins ago',
+            phone: '+15550199'
+          },
+          {
+            id: 'conv-2',
+            contactName: 'Sarah Jenkins',
+            channel: 'Email',
+            lastMessage: 'Attached is the signed lease renewal agreement for Unit 402.',
+            assignedUser: 'Leasing Officer',
+            status: 'Open',
+            lastActivity: '1 hour ago',
+            phone: '+15550188'
+          },
+          {
+            id: 'conv-3',
+            contactName: 'James Wilson',
+            channel: 'WhatsApp',
+            lastMessage: 'Paid rent for October via tenant portal. Please check confirmation.',
+            assignedUser: 'Accountant',
+            status: 'Closed',
+            lastActivity: '2 hours ago',
+            phone: '+15550177'
+          },
+          {
+            id: 'conv-4',
+            contactName: 'Robert Vance',
+            channel: 'Chat',
+            lastMessage: 'Is parking space #12 available for reservation next month?',
+            assignedUser: 'Property Manager Staff',
+            status: 'Pending',
+            lastActivity: 'Yesterday',
+            phone: '+15550166'
+          }
+        ]
+      });
     } catch (error) {
       next(error);
     }
@@ -166,7 +210,7 @@ export class CommunicationController {
   async getConversationById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      return sendSuccess({ res, data: { id, messages: [] } });
+      return sendSuccess({ res, data: { id, contactName: 'John Doe', messages: [] } });
     } catch (error) {
       next(error);
     }
@@ -193,7 +237,29 @@ export class CommunicationController {
 
   async getMessages(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      return sendSuccess({ res, data: [] });
+      return sendSuccess({
+        res,
+        data: [
+          {
+            id: 'msg-1',
+            conversationId: 'conv-1',
+            sender: 'John Doe',
+            recipient: 'Property Manager Staff',
+            body: 'Hi, when will the sink maintenance team arrive today?',
+            timestamp: '10:15 AM',
+            channel: 'SMS'
+          },
+          {
+            id: 'msg-2',
+            conversationId: 'conv-1',
+            sender: 'Property Manager Staff',
+            recipient: 'John Doe',
+            body: 'Hello John! The technician is scheduled to arrive between 2 PM and 4 PM today.',
+            timestamp: '10:20 AM',
+            channel: 'SMS'
+          }
+        ]
+      });
     } catch (error) {
       next(error);
     }
