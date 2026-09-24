@@ -25,6 +25,13 @@ import inspectionRoutes from './inspection.routes';
 import documentRoutes from './document.routes';
 import reportRoutes from '../reports/routes/report.routes';
 import integrationRoutes from './integration.routes';
+import communicationRoutes from './communication.routes';
+import emailRoutes from './email.routes';
+import smsRoutes from './sms.routes';
+import templateRoutes from './template.routes';
+import conversationRoutes from './conversation.routes';
+import messageRoutes from './message.routes';
+import aiRoutes from './ai.routes';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { superAdminController } from '../controllers/superadmin.controller';
 
@@ -81,6 +88,13 @@ router.use('/inspections', authMiddleware, inspectionRoutes);
 router.use('/documents', authMiddleware, documentRoutes);
 router.use('/reports', authMiddleware, reportRoutes);
 router.use('/integrations', authMiddleware, integrationRoutes);
+router.use('/communication', authMiddleware, communicationRoutes);
+router.use('/emails', authMiddleware, emailRoutes);
+router.use('/sms', authMiddleware, smsRoutes);
+router.use('/templates', authMiddleware, templateRoutes);
+router.use('/conversations', authMiddleware, conversationRoutes);
+router.use('/messages', authMiddleware, messageRoutes);
+router.use('/ai', authMiddleware, aiRoutes);
 router.use('/', authMiddleware, secondaryRoutes);
 
 export default router;

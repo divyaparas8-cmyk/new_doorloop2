@@ -581,18 +581,41 @@ class SuperAdminService {
         const totalPlans = await database_1.default.saaSPlan.count();
         const totalInvoices = await database_1.default.saaSInvoice.count();
         const invoiceSum = await database_1.default.saaSInvoice.aggregate({
+            where: { status: 'Paid' },
             _sum: { amount: true },
         });
+        const totalRevenue = invoiceSum._sum.amount || 0;
+        const now = new Date();
+        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const thisMonthSum = await database_1.default.saaSInvoice.aggregate({
+            where: { status: 'Paid', paidDate: { gte: startOfThisMonth } },
+            _sum: { amount: true },
+        });
+        const lastMonthSum = await database_1.default.saaSInvoice.aggregate({
+            where: { status: 'Paid', paidDate: { gte: startOfLastMonth, lt: startOfThisMonth } },
+            _sum: { amount: true },
+        });
+        const thisMonthRev = thisMonthSum._sum.amount || 0;
+        const lastMonthRev = lastMonthSum._sum.amount || 0;
+        let growthStr = '0%';
+        if (lastMonthRev > 0) {
+            const growth = ((thisMonthRev - lastMonthRev) / lastMonthRev) * 100;
+            growthStr = `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%`;
+        }
+        else if (thisMonthRev > 0) {
+            growthStr = '+100%';
+        }
         return {
             totalCompanies,
             activeCompanies,
             totalUsers,
             totalPlans,
             totalInvoices,
-            totalArr: invoiceSum._sum.amount || 149700,
-            monthlyGrowth: '12.4%',
+            totalArr: totalRevenue,
+            monthlyGrowth: growthStr,
             activeSubscriptions: activeCompanies,
-            storageUsed: '48.5 GB',
+            storageUsed: totalCompanies > 0 ? `${(totalCompanies * 0.5).toFixed(1)} GB` : '0 GB',
         };
     }
     // Platform Settings
@@ -639,23 +662,9 @@ class SuperAdminService {
     // Audit Logs
     async getAuditLogs() {
         try {
-            const logs = await database_1.default.auditLog.findMany({
+            return await database_1.default.auditLog.findMany({
                 orderBy: { timestamp: 'desc' },
             });
-            if (logs.length === 0) {
-                await database_1.default.auditLog.createMany({
-                    data: [
-                        { action: 'Company Status Suspended', module: 'SuperAdmin', object: 'Company', ip: '198.162.0.12', status: 'Success' },
-                        { action: 'Changed Platform SMTP Configuration', module: 'Settings', object: 'SMTP', ip: '198.162.0.12', status: 'Success' },
-                        { action: 'Generated New API Integration Key', module: 'Integrations', object: 'API Keys', ip: '198.162.0.8', status: 'Success' },
-                        { action: 'Created New SaaS Subscription Plan', module: 'Billing', object: 'SaaS Plan', ip: '198.162.0.12', status: 'Success' },
-                    ],
-                });
-                return database_1.default.auditLog.findMany({
-                    orderBy: { timestamp: 'desc' },
-                });
-            }
-            return logs;
         }
         catch (e) {
             console.error('Audit logs error:', e);

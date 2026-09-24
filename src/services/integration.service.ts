@@ -248,6 +248,82 @@ export class IntegrationService {
 
     return { success: false, message: 'Unsupported provider.' };
   }
+
+  /**
+   * Dispatch real SMS or WhatsApp message using company's active integration
+   */
+  async dispatchSMS(
+    companyId: string,
+    recipientPhone: string,
+    message: string
+  ): Promise<{ success: boolean; providerUsed?: string; messageId?: string }> {
+    if (!companyId || !recipientPhone) return { success: false };
+
+    const activeIntegrations = await prisma.companyIntegration.findMany({
+      where: { companyId, status: 'Active' }
+    });
+
+    const twilio = activeIntegrations.find(i => i.provider === 'TWILIO');
+    if (twilio && twilio.encryptedAuthToken && twilio.encryptionIv) {
+      try {
+        const rawToken = decrypt(twilio.encryptedAuthToken, twilio.encryptionIv);
+        const authHeader = Buffer.from(`${twilio.accountSid}:${rawToken}`).toString('base64');
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${twilio.accountSid}/Messages.json`;
+
+        const bodyParams = new URLSearchParams();
+        bodyParams.append('From', twilio.senderId || '');
+        bodyParams.append('To', recipientPhone);
+        bodyParams.append('Body', message);
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: bodyParams.toString(),
+        });
+
+        if (response.ok) {
+          const resData: any = await response.json();
+          return { success: true, providerUsed: 'TWILIO', messageId: resData.sid };
+        }
+      } catch (err) {
+        console.warn('Twilio dispatch error:', err);
+      }
+    }
+
+    const whatsapp = activeIntegrations.find(i => i.provider === 'WHATSAPP');
+    if (whatsapp && whatsapp.encryptedAuthToken && whatsapp.encryptionIv) {
+      try {
+        const rawToken = decrypt(whatsapp.encryptedAuthToken, whatsapp.encryptionIv);
+        const url = `https://graph.facebook.com/v20.0/${whatsapp.accountSid}/messages`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${rawToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: recipientPhone,
+            type: 'text',
+            text: { body: message }
+          })
+        });
+
+        if (response.ok) {
+          const resData: any = await response.json();
+          return { success: true, providerUsed: 'WHATSAPP', messageId: resData.messages?.[0]?.id };
+        }
+      } catch (err) {
+        console.warn('WhatsApp dispatch error:', err);
+      }
+    }
+
+    return { success: false };
+  }
 }
 
 export const integrationService = new IntegrationService();

@@ -6,6 +6,7 @@ import { createPaymentSchema } from '../validations/payment.validation';
 const router = Router();
 
 router.get('/', (req, res, next) => paymentController.getAll(req, res, next));
+router.get('/gateway-config', (req, res, next) => paymentController.getGatewayConfig(req, res, next));
 router.get('/:id', (req, res, next) => paymentController.getById(req, res, next));
 router.post('/', validateRequest(createPaymentSchema), (req, res, next) => paymentController.processPayment(req, res, next));
 router.put('/:id', (req, res, next) => paymentController.updatePayment(req, res, next));

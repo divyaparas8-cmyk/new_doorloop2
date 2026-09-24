@@ -657,6 +657,31 @@ export class SuperAdminService {
 
     const totalRevenue = invoiceSum._sum.amount || 0;
 
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const thisMonthSum = await prisma.saaSInvoice.aggregate({
+      where: { status: 'Paid', paidDate: { gte: startOfThisMonth } },
+      _sum: { amount: true },
+    });
+
+    const lastMonthSum = await prisma.saaSInvoice.aggregate({
+      where: { status: 'Paid', paidDate: { gte: startOfLastMonth, lt: startOfThisMonth } },
+      _sum: { amount: true },
+    });
+
+    const thisMonthRev = thisMonthSum._sum.amount || 0;
+    const lastMonthRev = lastMonthSum._sum.amount || 0;
+
+    let growthStr = '0%';
+    if (lastMonthRev > 0) {
+      const growth = ((thisMonthRev - lastMonthRev) / lastMonthRev) * 100;
+      growthStr = `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%`;
+    } else if (thisMonthRev > 0) {
+      growthStr = '+100%';
+    }
+
     return {
       totalCompanies,
       activeCompanies,
@@ -664,7 +689,7 @@ export class SuperAdminService {
       totalPlans,
       totalInvoices,
       totalArr: totalRevenue,
-      monthlyGrowth: '0%',
+      monthlyGrowth: growthStr,
       activeSubscriptions: activeCompanies,
       storageUsed: totalCompanies > 0 ? `${(totalCompanies * 0.5).toFixed(1)} GB` : '0 GB',
     };

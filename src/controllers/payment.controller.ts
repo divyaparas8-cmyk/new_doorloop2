@@ -88,6 +88,72 @@ export class PaymentController {
       next(error);
     }
   }
+
+  async getGatewayConfig(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        return sendSuccess({
+          res,
+          data: { provider: 'DIRECT_ACH', status: 'Inactive', gatewayName: 'Direct ACH / Bank Transfer' }
+        });
+      }
+
+      const activeIntegrations = await prisma.companyIntegration.findMany({
+        where: { companyId, status: 'Active' }
+      });
+
+      const stripe = activeIntegrations.find((i) => i.provider === 'STRIPE');
+      if (stripe && stripe.accountSid) {
+        return sendSuccess({
+          res,
+          data: {
+            provider: 'STRIPE',
+            status: 'Active',
+            publishableKey: stripe.accountSid,
+            gatewayName: 'Stripe Payments',
+          }
+        });
+      }
+
+      const razorpay = activeIntegrations.find((i) => i.provider === 'RAZORPAY');
+      if (razorpay && razorpay.accountSid) {
+        return sendSuccess({
+          res,
+          data: {
+            provider: 'RAZORPAY',
+            status: 'Active',
+            keyId: razorpay.accountSid,
+            gatewayName: 'Razorpay Gateway',
+          }
+        });
+      }
+
+      const authorizeNet = activeIntegrations.find((i) => i.provider === 'AUTHORIZE_NET');
+      if (authorizeNet && authorizeNet.accountSid) {
+        return sendSuccess({
+          res,
+          data: {
+            provider: 'AUTHORIZE_NET',
+            status: 'Active',
+            apiLoginId: authorizeNet.accountSid,
+            gatewayName: 'Authorize.Net Merchant',
+          }
+        });
+      }
+
+      return sendSuccess({
+        res,
+        data: {
+          provider: 'DIRECT_ACH',
+          status: 'Inactive',
+          gatewayName: 'Direct ACH / Bank Transfer'
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const paymentController = new PaymentController();
